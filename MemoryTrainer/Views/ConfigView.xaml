@@ -48,31 +48,93 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="60"/>
                                             <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0" Text="Days:" Style="{StaticResource Label}" Margin="0,0,4,0"/>
-                                        <TextBox Grid.Column="1" Text="{Binding DurationDays, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <!-- Duration -->
+                                        <TextBlock Grid.Column="0" Text="Duration:" Style="{StaticResource Label}" Margin="0,0,4,0">
+                                            <TextBlock.ToolTip>
+                                                <ToolTip>
+                                                    <StackPanel MaxWidth="260">
+                                                        <TextBlock Text="Duration" FontWeight="Bold" Margin="0,0,0,4"/>
+                                                        <TextBlock TextWrapping="Wrap" Text="How long after the screenshot is taken before you are prompted to recall. Enter days, hours, and/or minutes. Minimum: 1 minute."/>
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </TextBlock.ToolTip>
+                                        </TextBlock>
+                                        <StackPanel Grid.Column="1" Grid.ColumnSpan="6" Orientation="Horizontal">
+                                            <TextBox Text="{Binding DurationDays, UpdateSourceTrigger=PropertyChanged}" Width="42"
+                                                     ToolTip="Days component of the duration"/>
+                                            <TextBlock Text="d" Style="{StaticResource Label}" Margin="3,0,6,0"/>
+                                            <TextBox Text="{Binding DurationHours, UpdateSourceTrigger=PropertyChanged}" Width="42"
+                                                     ToolTip="Hours component of the duration"/>
+                                            <TextBlock Text="h" Style="{StaticResource Label}" Margin="3,0,6,0"/>
+                                            <TextBox Text="{Binding DurationMinutes, UpdateSourceTrigger=PropertyChanged}" Width="42"
+                                                     ToolTip="Minutes component of the duration"/>
+                                            <TextBlock Text="m" Style="{StaticResource Label}" Margin="3,0,0,0"/>
+                                        </StackPanel>
 
-                                        <TextBlock Grid.Column="2" Text="Hours:" Style="{StaticResource Label}" Margin="8,0,4,0"/>
-                                        <TextBox Grid.Column="3" Text="{Binding DurationHours, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <!-- Waiting Window -->
+                                        <TextBlock Grid.Column="7" Text="Window:" Style="{StaticResource Label}" Margin="12,0,4,0">
+                                            <TextBlock.ToolTip>
+                                                <ToolTip>
+                                                    <StackPanel MaxWidth="260">
+                                                        <TextBlock Text="Waiting Window" FontWeight="Bold" Margin="0,0,0,4"/>
+                                                        <TextBlock TextWrapping="Wrap" Text="The screenshot is taken at a random moment within this many minutes of the cycle starting. Adds unpredictability so you can't anticipate the exact capture time. Must be less than the duration."/>
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </TextBlock.ToolTip>
+                                        </TextBlock>
+                                        <StackPanel Grid.Column="8" Orientation="Horizontal">
+                                            <TextBox Text="{Binding WaitingWindowMinutes, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
+                                            <TextBlock Text="min" Style="{StaticResource Label}" Margin="4,0,0,0"/>
+                                        </StackPanel>
 
-                                        <TextBlock Grid.Column="4" Text="Min:" Style="{StaticResource Label}" Margin="8,0,4,0"/>
-                                        <TextBox Grid.Column="5" Text="{Binding DurationMinutes, UpdateSourceTrigger=PropertyChanged}"/>
+                                        <!-- Drift -->
+                                        <TextBlock Grid.Column="9" Text="Drift:" Style="{StaticResource Label}" Margin="12,0,4,0">
+                                            <TextBlock.ToolTip>
+                                                <ToolTip>
+                                                    <StackPanel MaxWidth="260">
+                                                        <TextBlock Text="Drift" FontWeight="Bold" Margin="0,0,0,4"/>
+                                                        <TextBlock TextWrapping="Wrap" Text="Each repeat cycle gets a random adjustment of ±this many minutes applied to its duration. Keeps the timing varied so you can't develop a fixed rhythm. Set to 0 for a fixed duration."/>
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </TextBlock.ToolTip>
+                                        </TextBlock>
+                                        <StackPanel Grid.Column="10" Orientation="Horizontal">
+                                            <TextBox Text="{Binding DriftMinutes, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
+                                            <TextBlock Text="min" Style="{StaticResource Label}" Margin="4,0,0,0"/>
+                                        </StackPanel>
 
-                                        <TextBlock Grid.Column="6" Text="Window (min):" Style="{StaticResource Label}" Margin="8,0,4,0"/>
-                                        <TextBox Grid.Column="7" Text="{Binding WaitingWindowMinutes, UpdateSourceTrigger=PropertyChanged}"/>
-
-                                        <TextBlock Grid.Column="8" Text="Drift (min):" Style="{StaticResource Label}" Margin="8,0,4,0"/>
-                                        <TextBox Grid.Column="9" Text="{Binding DriftMinutes, UpdateSourceTrigger=PropertyChanged}"/>
-
-                                        <CheckBox Grid.Column="10" Content="Free Recall" IsChecked="{Binding FreeRecallEnabled}" Margin="12,0,8,0" VerticalAlignment="Center"/>
-                                        <CheckBox Grid.Column="11" Content="Recognition" IsChecked="{Binding RecognitionEnabled}" VerticalAlignment="Center"/>
+                                        <!-- Recall mode toggles -->
+                                        <StackPanel Grid.Column="11" Orientation="Horizontal" Margin="14,0,0,0">
+                                            <CheckBox Content="Free Recall" IsChecked="{Binding FreeRecallEnabled}" Margin="0,0,10,0" VerticalAlignment="Center">
+                                                <CheckBox.ToolTip>
+                                                    <ToolTip>
+                                                        <StackPanel MaxWidth="260">
+                                                            <TextBlock Text="Free Recall" FontWeight="Bold" Margin="0,0,0,4"/>
+                                                            <TextBlock TextWrapping="Wrap" Text="You write what you remember before seeing the screenshot. Then you self-evaluate as Correct, Partial, or Wrong after opening the screenshot link."/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </CheckBox.ToolTip>
+                                            </CheckBox>
+                                            <CheckBox Content="Recognition" IsChecked="{Binding RecognitionEnabled}" VerticalAlignment="Center">
+                                                <CheckBox.ToolTip>
+                                                    <ToolTip>
+                                                        <StackPanel MaxWidth="260">
+                                                            <TextBlock Text="Recognition Recall" FontWeight="Bold" Margin="0,0,0,4"/>
+                                                            <TextBlock TextWrapping="Wrap" Text="You pick the correct screenshot from a set of options. One is the real capture; the rest are decoys from surrounding times. Evaluated automatically."/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </CheckBox.ToolTip>
+                                            </CheckBox>
+                                        </StackPanel>
 
                                         <Button Grid.Column="13" Content="✕" Style="{StaticResource DangerButton}"
                                                 Width="28" Height="28" Padding="0"
+                                                ToolTip="Remove this duration cycle"
                                                 Command="{Binding DataContext.RemoveCycleCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                 CommandParameter="{Binding}"/>
                                     </Grid>
@@ -87,7 +149,16 @@
                                         <Button Content="{Binding DecoyOffsetExpanded, Converter={StaticResource BoolToDecoyButtonText}}"
                                                 Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left"
                                                 Padding="8,4" FontSize="11"
-                                                Click="OnToggleDecoyExpand"/>
+                                                Click="OnToggleDecoyExpand">
+                                            <Button.ToolTip>
+                                                <ToolTip>
+                                                    <StackPanel MaxWidth="260">
+                                                        <TextBlock Text="Decoy Offsets" FontWeight="Bold" Margin="0,0,0,4"/>
+                                                        <TextBlock TextWrapping="Wrap" Text="Extra screenshots captured at ±N minutes relative to the main screenshot time T. These become the wrong options in the Recognition task. Example: -5 captures 5 minutes before T; +10 captures 10 minutes after T."/>
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
 
                                         <ItemsControl ItemsSource="{Binding DecoyOffsets}"
                                                       Visibility="{Binding DecoyOffsetExpanded, Converter={StaticResource BoolToVisibility}}"
@@ -95,11 +166,13 @@
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate DataType="{x:Type vm:DecoyOffsetViewModel}">
                                                     <StackPanel Orientation="Horizontal" Margin="0,2,0,2">
-                                                        <ComboBox SelectedItem="{Binding Sign}" Width="50" Margin="0,0,4,0">
+                                                        <ComboBox SelectedItem="{Binding Sign}" Width="50" Margin="0,0,4,0"
+                                                                  ToolTip="Direction relative to screenshot time T: − means before, + means after">
                                                             <ComboBoxItem>+</ComboBoxItem>
                                                             <ComboBoxItem>-</ComboBoxItem>
                                                         </ComboBox>
-                                                        <TextBox Text="{Binding OffsetMinutes, UpdateSourceTrigger=PropertyChanged}" Width="60"/>
+                                                        <TextBox Text="{Binding OffsetMinutes, UpdateSourceTrigger=PropertyChanged}" Width="60"
+                                                                 ToolTip="Number of minutes before or after T to capture this decoy"/>
                                                         <TextBlock Text="min" Style="{StaticResource Label}" Margin="6,0,8,0"/>
                                                         <Button Content="Remove" Style="{StaticResource SecondaryButton}" Padding="6,3" FontSize="11"
                                                                 Command="{Binding DataContext.RemoveDecoyOffsetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
@@ -113,7 +186,8 @@
                                                 HorizontalAlignment="Left" Padding="8,4" FontSize="11"
                                                 Margin="0,4,0,0"
                                                 Command="{Binding AddDecoyOffsetCommand}"
-                                                Visibility="{Binding DecoyOffsetExpanded, Converter={StaticResource BoolToVisibility}}"/>
+                                                Visibility="{Binding DecoyOffsetExpanded, Converter={StaticResource BoolToVisibility}}"
+                                                ToolTip="Add another decoy offset time"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -123,12 +197,17 @@
 
                 <Button Content="+ Add Duration Cycle" Style="{StaticResource SecondaryButton}"
                         HorizontalAlignment="Left" Margin="0,4,0,16"
-                        Command="{Binding AddCycleCommand}"/>
+                        Command="{Binding AddCycleCommand}"
+                        ToolTip="Add another independent recall cycle with a different duration"/>
 
                 <!-- Session name -->
-                <TextBlock Text="Session Name (optional)" Style="{StaticResource Label}" Margin="0,0,0,4"/>
+                <TextBlock Style="{StaticResource Label}" Margin="0,0,0,4">
+                    <Run Text="Session Name"/>
+                    <Run Text=" (optional)" Foreground="{StaticResource TextSecondaryBrush}"/>
+                </TextBlock>
                 <TextBox Text="{Binding SessionName, UpdateSourceTrigger=PropertyChanged}"
-                         Margin="0,0,0,16" MaxWidth="400" HorizontalAlignment="Left"/>
+                         Margin="0,0,0,16" MaxWidth="400" HorizontalAlignment="Left"
+                         ToolTip="A label for this session. Auto-generated from date/time if left blank."/>
             </StackPanel>
         </ScrollViewer>
 
@@ -136,6 +215,7 @@
         <Button Grid.Row="2" Content="Start Session"
                 Command="{Binding StartSessionCommand}"
                 IsEnabled="{Binding CanStart}"
-                Margin="20,8,20,20" Height="40" FontSize="14" FontWeight="SemiBold"/>
+                Margin="20,8,20,20" Height="40" FontSize="14" FontWeight="SemiBold"
+                ToolTip="Begin all configured duration cycles simultaneously"/>
     </Grid>
 </UserControl>

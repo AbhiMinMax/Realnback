@@ -26,7 +26,8 @@
         <!-- Filter bar -->
         <WrapPanel Grid.Row="1" Margin="20,0,20,8" Orientation="Horizontal">
             <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
-                <TextBlock Text="Date:" Style="{StaticResource Label}" Margin="0,0,6,0"/>
+                <TextBlock Text="Date:" Style="{StaticResource Label}" Margin="0,0,6,0"
+                           ToolTip="Filter results to a time range. Day = last 24 h, Week = last 7 days, etc."/>
                 <ComboBox SelectedItem="{Binding DatePreset}" Width="80">
                     <ComboBoxItem>Day</ComboBoxItem>
                     <ComboBoxItem>Week</ComboBoxItem>
@@ -37,11 +38,13 @@
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,12,4"
                         Visibility="{Binding DatePreset, Converter={StaticResource NullToCollapsedConverter}}">
-                <TextBlock Text="Show Missed:" Style="{StaticResource Label}" Margin="0,0,6,0"/>
+                <TextBlock Text="Show Missed:" Style="{StaticResource Label}" Margin="0,0,6,0"
+                           ToolTip="Missed cycles are ones where the app was closed before the screenshot could be taken. Off by default because they don't have recall data."/>
                 <CheckBox IsChecked="{Binding ShowMissed}" VerticalAlignment="Center"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
-                <TextBlock Text="Mode:" Style="{StaticResource Label}" Margin="0,0,6,0"/>
+                <TextBlock Text="Mode:" Style="{StaticResource Label}" Margin="0,0,6,0"
+                           ToolTip="Filter by recall mode: Free Recall (written recall you self-evaluated) or Recognition (screenshot selection task)."/>
                 <ComboBox SelectedItem="{Binding RecallModeFilter}" Width="110">
                     <ComboBoxItem>All</ComboBoxItem>
                     <ComboBoxItem>Free Recall</ComboBoxItem>
@@ -49,7 +52,8 @@
                 </ComboBox>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
-                <TextBlock Text="Sort:" Style="{StaticResource Label}" Margin="0,0,6,0"/>
+                <TextBlock Text="Sort:" Style="{StaticResource Label}" Margin="0,0,6,0"
+                           ToolTip="Sort the detail list by date, duration slot, or recall result."/>
                 <ComboBox SelectedItem="{Binding SortBy}" Width="80">
                     <ComboBoxItem>Date</ComboBoxItem>
                     <ComboBoxItem>Duration</ComboBoxItem>
@@ -57,7 +61,8 @@
                 </ComboBox>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
-                <TextBlock Text="Session:" Style="{StaticResource Label}" Margin="0,0,6,0"/>
+                <TextBlock Text="Session:" Style="{StaticResource Label}" Margin="0,0,6,0"
+                           ToolTip="Narrow results to a specific session. Leave blank to show all sessions."/>
                 <ComboBox ItemsSource="{Binding Sessions}"
                           SelectedItem="{Binding SelectedSession}"
                           DisplayMemberPath="Name" Width="160"/>
@@ -78,23 +83,34 @@
                     </Grid.ColumnDefinitions>
                     <!-- Free recall stats -->
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="Free Recall" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock Text="Free Recall" FontWeight="SemiBold" Margin="0,0,0,4"
+                                   ToolTip="Written recall you self-evaluated as Correct, Partial, or Wrong."/>
                         <WrapPanel>
-                            <TextBlock Text="{Binding TotalFreeRecall, StringFormat='Total: {0}'}" Margin="0,0,16,0" Style="{StaticResource Label}"/>
-                            <TextBlock Text="{Binding CorrectFreeRecallPct, StringFormat='Correct: {0}'}" Foreground="{StaticResource SuccessBrush}" Margin="0,0,16,0"/>
-                            <TextBlock Text="{Binding PartialFreeRecallPct, StringFormat='Partial: {0}'}" Foreground="{StaticResource WarningBrush}" Margin="0,0,16,0"/>
-                            <TextBlock Text="{Binding WrongFreeRecallPct, StringFormat='Wrong: {0}'}" Foreground="{StaticResource ErrorBrush}" Margin="0,0,16,0"/>
-                            <TextBlock Text="{Binding FreeRecallStreak, StringFormat='Streak: {0}'}" Foreground="{StaticResource AccentBrush}"/>
+                            <TextBlock Text="{Binding TotalFreeRecall, StringFormat='Total: {0}'}" Margin="0,0,16,0" Style="{StaticResource Label}"
+                                       ToolTip="Number of completed free recall evaluations in this period."/>
+                            <TextBlock Text="{Binding CorrectFreeRecallPct, StringFormat='Correct: {0}'}" Foreground="{StaticResource SuccessBrush}" Margin="0,0,16,0"
+                                       ToolTip="Right screen/app AND specific content recalled accurately."/>
+                            <TextBlock Text="{Binding PartialFreeRecallPct, StringFormat='Partial: {0}'}" Foreground="{StaticResource WarningBrush}" Margin="0,0,16,0"
+                                       ToolTip="Context right but content missed, or vice versa."/>
+                            <TextBlock Text="{Binding WrongFreeRecallPct, StringFormat='Wrong: {0}'}" Foreground="{StaticResource ErrorBrush}" Margin="0,0,16,0"
+                                       ToolTip="Neither screen nor content recalled correctly."/>
+                            <TextBlock Text="{Binding FreeRecallStreak, StringFormat='Streak: {0}'}" Foreground="{StaticResource AccentBrush}"
+                                       ToolTip="Current consecutive Correct count (most recent first). Resets on any non-Correct result."/>
                         </WrapPanel>
                     </StackPanel>
                     <!-- Recognition stats -->
                     <StackPanel Grid.Column="1">
-                        <TextBlock Text="Recognition" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock Text="Recognition" FontWeight="SemiBold" Margin="0,0,0,4"
+                                   ToolTip="Screenshot selection task — you picked the correct screenshot from a set of options."/>
                         <WrapPanel>
-                            <TextBlock Text="{Binding TotalRecognition, StringFormat='Total: {0}'}" Margin="0,0,16,0" Style="{StaticResource Label}"/>
-                            <TextBlock Text="{Binding CorrectRecognitionPct, StringFormat='Correct: {0}'}" Foreground="{StaticResource SuccessBrush}" Margin="0,0,16,0"/>
-                            <TextBlock Text="{Binding WrongRecognitionPct, StringFormat='Wrong: {0}'}" Foreground="{StaticResource ErrorBrush}" Margin="0,0,16,0"/>
-                            <TextBlock Text="{Binding RecognitionStreak, StringFormat='Streak: {0}'}" Foreground="{StaticResource AccentBrush}"/>
+                            <TextBlock Text="{Binding TotalRecognition, StringFormat='Total: {0}'}" Margin="0,0,16,0" Style="{StaticResource Label}"
+                                       ToolTip="Number of completed recognition evaluations in this period."/>
+                            <TextBlock Text="{Binding CorrectRecognitionPct, StringFormat='Correct: {0}'}" Foreground="{StaticResource SuccessBrush}" Margin="0,0,16,0"
+                                       ToolTip="You selected the real screenshot."/>
+                            <TextBlock Text="{Binding WrongRecognitionPct, StringFormat='Wrong: {0}'}" Foreground="{StaticResource ErrorBrush}" Margin="0,0,16,0"
+                                       ToolTip="You selected a decoy."/>
+                            <TextBlock Text="{Binding RecognitionStreak, StringFormat='Streak: {0}'}" Foreground="{StaticResource AccentBrush}"
+                                       ToolTip="Current consecutive Correct count. Resets on any wrong selection."/>
                         </WrapPanel>
                     </StackPanel>
                 </Grid>

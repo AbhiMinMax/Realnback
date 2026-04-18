@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace MemoryTrainer.Helpers;
 
 public static class PathHelper
@@ -5,12 +7,60 @@ public static class PathHelper
     public static string AppFolder => AppContext.BaseDirectory;
     public static string DataFolder => Path.Combine(AppFolder, "data");
     public static string DatabasePath => Path.Combine(DataFolder, "memorytrainer.db");
-    public static string ScreenshotsPath => Path.Combine(DataFolder, "screenshots");
     public static string ErrorLogPath => Path.Combine(DataFolder, "error.log");
+    public static string SettingsFilePath => Path.Combine(DataFolder, "appsettings.json");
+
+    private static string? _screenshotsPathOverride;
+
+    public static string ScreenshotsPath
+    {
+        get => _screenshotsPathOverride ?? Path.Combine(DataFolder, "screenshots");
+        set
+        {
+            _screenshotsPathOverride = string.IsNullOrWhiteSpace(value) ? null : value;
+            Directory.CreateDirectory(ScreenshotsPath);
+            SaveSettings();
+        }
+    }
 
     public static void EnsureDataDirectories()
     {
         Directory.CreateDirectory(DataFolder);
+        LoadSettings();
         Directory.CreateDirectory(ScreenshotsPath);
+    }
+
+    public static void LoadSettings()
+    {
+        try
+        {
+            if (!File.Exists(SettingsFilePath)) return;
+            var json = File.ReadAllText(SettingsFilePath);
+            var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("ScreenshotsPath", out var el))
+            {
+                var val = el.GetString();
+                if (!string.IsNullOrWhiteSpace(val))
+                    _screenshotsPathOverride = val;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PathHelper] Failed to load settings: {ex.Message}");
+        }
+    }
+
+    public static void SaveSettings()
+    {
+        try
+        {
+            var settings = new { ScreenshotsPath = _screenshotsPathOverride };
+            var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(SettingsFilePath, json);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PathHelper] Failed to save settings: {ex.Message}");
+        }
     }
 }

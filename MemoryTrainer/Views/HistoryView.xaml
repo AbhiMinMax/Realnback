@@ -28,7 +28,7 @@
             <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
                 <TextBlock Text="Date:" Style="{StaticResource Label}" Margin="0,0,6,0"
                            ToolTip="Filter results to a time range. Day = last 24 h, Week = last 7 days, etc."/>
-                <ComboBox SelectedItem="{Binding DatePreset}" Width="80">
+                <ComboBox SelectedValue="{Binding DatePreset}" SelectedValuePath="Content" Width="80">
                     <ComboBoxItem>Day</ComboBoxItem>
                     <ComboBoxItem>Week</ComboBoxItem>
                     <ComboBoxItem>Month</ComboBoxItem>
@@ -45,7 +45,7 @@
             <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
                 <TextBlock Text="Mode:" Style="{StaticResource Label}" Margin="0,0,6,0"
                            ToolTip="Filter by recall mode: Free Recall (written recall you self-evaluated) or Recognition (screenshot selection task)."/>
-                <ComboBox SelectedItem="{Binding RecallModeFilter}" Width="110">
+                <ComboBox SelectedValue="{Binding RecallModeFilter}" SelectedValuePath="Content" Width="110">
                     <ComboBoxItem>All</ComboBoxItem>
                     <ComboBoxItem>Free Recall</ComboBoxItem>
                     <ComboBoxItem>Recognition</ComboBoxItem>
@@ -54,7 +54,7 @@
             <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
                 <TextBlock Text="Sort:" Style="{StaticResource Label}" Margin="0,0,6,0"
                            ToolTip="Sort the detail list by date, duration slot, or recall result."/>
-                <ComboBox SelectedItem="{Binding SortBy}" Width="80">
+                <ComboBox SelectedValue="{Binding SortBy}" SelectedValuePath="Content" Width="80">
                     <ComboBoxItem>Date</ComboBoxItem>
                     <ComboBoxItem>Duration</ComboBoxItem>
                     <ComboBoxItem>Result</ComboBoxItem>

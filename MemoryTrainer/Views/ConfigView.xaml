@@ -166,7 +166,8 @@
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate DataType="{x:Type vm:DecoyOffsetViewModel}">
                                                     <StackPanel Orientation="Horizontal" Margin="0,2,0,2">
-                                                        <ComboBox SelectedItem="{Binding Sign}" Width="50" Margin="0,0,4,0"
+                                                        <ComboBox SelectedValue="{Binding Sign}" SelectedValuePath="Content"
+                                                                  Width="50" Margin="0,0,4,0"
                                                                   ToolTip="Direction relative to screenshot time T: − means before, + means after">
                                                             <ComboBoxItem>+</ComboBoxItem>
                                                             <ComboBoxItem>-</ComboBoxItem>

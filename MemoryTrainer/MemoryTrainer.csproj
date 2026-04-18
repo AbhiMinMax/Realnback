@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>Assets\tray_icon.ico</ApplicationIcon>
+    <AssemblyName>MemoryTrainer</AssemblyName>
+    <RootNamespace>MemoryTrainer</RootNamespace>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.*" />
+    <PackageReference Include="Dapper" Version="2.*" />
+    <PackageReference Include="System.Drawing.Common" Version="9.*" />
+    <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\tray_icon.ico" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,168 @@
+<UserControl x:Class="MemoryTrainer.Views.HistoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MemoryTrainer.ViewModels"
+             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF">
+
+    <Grid Background="{StaticResource BackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top bar -->
+        <Grid Grid.Row="0" Margin="20,16,20,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button Content="← Back" Style="{StaticResource SecondaryButton}" Command="{Binding GoBackCommand}"/>
+            <TextBlock Grid.Column="1" Text="History" FontSize="18" FontWeight="Bold"
+                       VerticalAlignment="Center" Margin="12,0,0,0"/>
+        </Grid>
+
+        <!-- Filter bar -->
+        <WrapPanel Grid.Row="1" Margin="20,0,20,8" Orientation="Horizontal">
+            <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
+                <TextBlock Text="Date:" Style="{StaticResource Label}" Margin="0,0,6,0"/>
+                <ComboBox SelectedItem="{Binding DatePreset}" Width="80">
+                    <ComboBoxItem>Day</ComboBoxItem>
+                    <ComboBoxItem>Week</ComboBoxItem>
+                    <ComboBoxItem>Month</ComboBoxItem>
+                    <ComboBoxItem>Year</ComboBoxItem>
+                    <ComboBoxItem>Custom</ComboBoxItem>
+                </ComboBox>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,12,4"
+                        Visibility="{Binding DatePreset, Converter={StaticResource NullToCollapsedConverter}}">
+                <TextBlock Text="Show Missed:" Style="{StaticResource Label}" Margin="0,0,6,0"/>
+                <CheckBox IsChecked="{Binding ShowMissed}" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
+                <TextBlock Text="Mode:" Style="{StaticResource Label}" Margin="0,0,6,0"/>
+                <ComboBox SelectedItem="{Binding RecallModeFilter}" Width="110">
+                    <ComboBoxItem>All</ComboBoxItem>
+                    <ComboBoxItem>Free Recall</ComboBoxItem>
+                    <ComboBoxItem>Recognition</ComboBoxItem>
+                </ComboBox>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
+                <TextBlock Text="Sort:" Style="{StaticResource Label}" Margin="0,0,6,0"/>
+                <ComboBox SelectedItem="{Binding SortBy}" Width="80">
+                    <ComboBoxItem>Date</ComboBoxItem>
+                    <ComboBoxItem>Duration</ComboBoxItem>
+                    <ComboBoxItem>Result</ComboBoxItem>
+                </ComboBox>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
+                <TextBlock Text="Session:" Style="{StaticResource Label}" Margin="0,0,6,0"/>
+                <ComboBox ItemsSource="{Binding Sessions}"
+                          SelectedItem="{Binding SelectedSession}"
+                          DisplayMemberPath="Name" Width="160"/>
+            </StackPanel>
+        </WrapPanel>
+
+        <!-- Aggregation panel -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="20,0,20,8">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="120"/>
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <!-- Free recall stats -->
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Free Recall" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <WrapPanel>
+                            <TextBlock Text="{Binding TotalFreeRecall, StringFormat='Total: {0}'}" Margin="0,0,16,0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="{Binding CorrectFreeRecallPct, StringFormat='Correct: {0}'}" Foreground="{StaticResource SuccessBrush}" Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding PartialFreeRecallPct, StringFormat='Partial: {0}'}" Foreground="{StaticResource WarningBrush}" Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding WrongFreeRecallPct, StringFormat='Wrong: {0}'}" Foreground="{StaticResource ErrorBrush}" Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding FreeRecallStreak, StringFormat='Streak: {0}'}" Foreground="{StaticResource AccentBrush}"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <!-- Recognition stats -->
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Recognition" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <WrapPanel>
+                            <TextBlock Text="{Binding TotalRecognition, StringFormat='Total: {0}'}" Margin="0,0,16,0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="{Binding CorrectRecognitionPct, StringFormat='Correct: {0}'}" Foreground="{StaticResource SuccessBrush}" Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding WrongRecognitionPct, StringFormat='Wrong: {0}'}" Foreground="{StaticResource ErrorBrush}" Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding RecognitionStreak, StringFormat='Streak: {0}'}" Foreground="{StaticResource AccentBrush}"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Grid>
+                <!-- Chart -->
+                <lvc:CartesianChart Grid.Row="1"
+                                    Series="{Binding ChartSeries}"
+                                    XAxes="{Binding ChartXAxes}"
+                                    Margin="0,8,0,0"/>
+            </Grid>
+        </Border>
+
+        <!-- Detail table -->
+        <Grid Grid.Row="3" Margin="20,0,20,20">
+            <TextBlock Text="No results match the current filters."
+                       Visibility="{Binding HasNoResults, Converter={StaticResource BoolToVisibility}}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Style="{StaticResource Label}"/>
+
+            <ScrollViewer Visibility="{Binding HasNoResults, Converter={StaticResource InverseBoolToVisibility}}">
+                <ItemsControl ItemsSource="{Binding Rows}"
+                              VirtualizingStackPanel.IsVirtualizing="True"
+                              VirtualizingStackPanel.VirtualizationMode="Recycling">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <VirtualizingStackPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:HistoryRowViewModel}">
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
+                                    Padding="4,6">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding ScreenshotTime}" Style="{StaticResource Label}"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding SessionName}" Style="{StaticResource Label}"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding DurationSlot}" Style="{StaticResource Label}"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding CycleNumber, StringFormat='#{0}'}" Style="{StaticResource Label}"/>
+                                        <TextBlock Grid.Column="4" Text="{Binding FreeRecallResult}"
+                                                   Foreground="{Binding FreeRecallResult, Converter={StaticResource EvalResultToColor}}"/>
+                                        <TextBlock Grid.Column="5" Text="{Binding RecognitionResult}"
+                                                   Foreground="{Binding RecognitionResult, Converter={StaticResource EvalResultToColor}}"/>
+                                        <TextBlock Grid.Column="6" Text="{Binding FreeRecallTextShort}"
+                                                   Style="{StaticResource Label}" TextTrimming="CharacterEllipsis"/>
+                                        <Button Grid.Column="7" Content="▼" Style="{StaticResource SecondaryButton}"
+                                                Padding="4,2" FontSize="10"
+                                                Click="OnExpandRow"/>
+                                    </Grid>
+                                    <!-- Expanded row -->
+                                    <TextBlock Text="{Binding FreeRecallTextFull}"
+                                               Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}"
+                                               TextWrapping="Wrap" Margin="0,6,0,0"
+                                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</UserControl>

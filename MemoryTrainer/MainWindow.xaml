@@ -1,0 +1,28 @@
+<Window x:Class="MemoryTrainer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:MemoryTrainer.ViewModels"
+        xmlns:views="clr-namespace:MemoryTrainer.Views"
+        mc:Ignorable="d"
+        Title="MemoryTrainer" Height="680" Width="900"
+        MinHeight="500" MinWidth="700">
+
+    <Window.Resources>
+        <DataTemplate DataType="{x:Type vm:ConfigViewModel}">
+            <views:ConfigView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ActiveSessionViewModel}">
+            <views:ActiveSessionView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:HistoryViewModel}">
+            <views:HistoryView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+            <views:SettingsView/>
+        </DataTemplate>
+    </Window.Resources>
+
+    <ContentControl Content="{Binding CurrentView}"/>
+</Window>

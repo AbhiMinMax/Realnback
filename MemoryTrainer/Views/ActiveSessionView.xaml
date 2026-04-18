@@ -1,0 +1,63 @@
+<UserControl x:Class="MemoryTrainer.Views.ActiveSessionView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MemoryTrainer.ViewModels">
+
+    <Grid Background="{StaticResource BackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="20,16,20,8">
+            <TextBlock Text="{Binding SessionName}" FontSize="18" FontWeight="Bold"/>
+            <TextBlock Text="{Binding SessionStartTime, StringFormat='Started: {0}'}" Style="{StaticResource Label}"/>
+            <TextBlock Margin="0,4,0,0" Foreground="{StaticResource WarningBrush}"
+                       Visibility="{Binding QueuedPromptCount, Converter={StaticResource NullToCollapsedConverter}}">
+                <TextBlock.Text>
+                    <Binding Path="QueuedPromptCount" StringFormat="{}{0} prompt(s) waiting"/>
+                </TextBlock.Text>
+            </TextBlock>
+        </StackPanel>
+
+        <!-- Cycle status list -->
+        <ScrollViewer Grid.Row="1" Margin="20,0,20,0">
+            <ItemsControl ItemsSource="{Binding CycleStatuses}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:CycleStatusViewModel}">
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold">
+                                        <Run Text="{Binding DurationLabel}"/>
+                                        <Run Text=" — Cycle "/>
+                                        <Run Text="{Binding CycleNumber}"/>
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding StatusText}" Style="{StaticResource Label}" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{Binding CountdownText}"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           FontFamily="Consolas" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Action buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="20,8,20,20" HorizontalAlignment="Right">
+            <Button Content="{Binding IsPaused, Converter={StaticResource BoolToPauseResume}}"
+                    Style="{StaticResource SecondaryButton}" Margin="0,0,10,0"
+                    Command="{Binding TogglePauseCommand}"/>
+            <Button Content="Stop Session" Style="{StaticResource DangerButton}"
+                    Command="{Binding StopSessionCommand}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

@@ -9,6 +9,7 @@ public partial class ActiveSessionViewModel : ObservableObject, IDisposable
 {
     private readonly SessionEngine _engine;
     private readonly Action _onSessionStopped;
+    private readonly Action _onShowHistory;
 
     [ObservableProperty] private string _sessionName = string.Empty;
     [ObservableProperty] private string _sessionStartTime = string.Empty;
@@ -17,10 +18,11 @@ public partial class ActiveSessionViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<CycleStatusViewModel> CycleStatuses { get; } = new();
 
-    public ActiveSessionViewModel(SessionEngine engine, Action onSessionStopped)
+    public ActiveSessionViewModel(SessionEngine engine, Action onSessionStopped, Action onShowHistory)
     {
         _engine = engine;
         _onSessionStopped = onSessionStopped;
+        _onShowHistory = onShowHistory;
         engine.SessionStateChanged += OnSessionStateChanged;
         Refresh();
     }
@@ -53,6 +55,9 @@ public partial class ActiveSessionViewModel : ObservableObject, IDisposable
             QueuedPromptCount = _engine.QueuedPromptCount;
         });
     }
+
+    [RelayCommand]
+    private void ShowHistory() => _onShowHistory();
 
     [RelayCommand]
     private async Task TogglePauseAsync()

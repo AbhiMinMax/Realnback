@@ -23,6 +23,8 @@ public partial class RecognitionOptionViewModel : ObservableObject
 
     [ObservableProperty] private bool _isSelected;
     [ObservableProperty] private bool _isFileAvailable;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(PlayStopLabel))] private bool _isPlaying;
+    public string PlayStopLabel => IsPlaying ? "⏹ Stop" : "▶ Play";
 }
 
 public partial class RecallPromptViewModel : ObservableObject
@@ -58,27 +60,40 @@ public partial class RecallPromptViewModel : ObservableObject
     private CaptureRecord? _mainCapture;
 
     public bool CanVerify => !string.IsNullOrEmpty(RecallText);
-    public System.Collections.Generic.List<RecognitionOptionViewModel> RecognitionOptions { get; } = new();
+    public System.Collections.ObjectModel.ObservableCollection<RecognitionOptionViewModel> RecognitionOptions { get; } = new();
 
     // ── Audio tab ──
     [ObservableProperty] private string _audioHeaderText = string.Empty;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanVerifyAudio))] private string _audioRecallText = string.Empty;
     [ObservableProperty] private bool _audioIsVerified;
-    [ObservableProperty] private bool _audioRecallCompleted;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowAudioRecognition))] private bool _audioRecallCompleted;
     [ObservableProperty] private EvaluationResult? _audioEvalResult;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(AudioPlayLabel))] private bool _audioIsPlaying;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowAudioRecognition))] private bool _audioRecognitionAvailable;
+    [ObservableProperty] private bool _audioRecognitionCompleted;
     private CaptureRecord? _audioCapture;
+    private readonly AudioPlayerService _audioPlayer = new();
+    private readonly AudioPlayerService _audioOptionPlayer = new();
+    private RecognitionOptionViewModel? _playingAudioOption;
 
     public bool CanVerifyAudio => !string.IsNullOrEmpty(AudioRecallText);
+    public string AudioPlayLabel => AudioIsPlaying ? "⏸ Pause" : "▶ Play";
+    public bool ShowAudioRecognition => AudioRecallCompleted && AudioRecognitionAvailable;
+    public System.Collections.ObjectModel.ObservableCollection<RecognitionOptionViewModel> AudioRecognitionOptions { get; } = new();
 
     // ── Camera tab ──
     [ObservableProperty] private string _cameraHeaderText = string.Empty;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanVerifyCamera))] private string _cameraRecallText = string.Empty;
     [ObservableProperty] private bool _cameraIsVerified;
-    [ObservableProperty] private bool _cameraRecallCompleted;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowCameraRecognition))] private bool _cameraRecallCompleted;
     [ObservableProperty] private EvaluationResult? _cameraEvalResult;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowCameraRecognition))] private bool _cameraRecognitionAvailable;
+    [ObservableProperty] private bool _cameraRecognitionCompleted;
     private CaptureRecord? _cameraCapture;
 
     public bool CanVerifyCamera => !string.IsNullOrEmpty(CameraRecallText);
+    public bool ShowCameraRecognition => CameraRecallCompleted && CameraRecognitionAvailable;
+    public System.Collections.ObjectModel.ObservableCollection<RecognitionOptionViewModel> CameraRecognitionOptions { get; } = new();
 
     // ── Navigation ──
     [ObservableProperty] private bool _canGoNext;
@@ -121,9 +136,15 @@ public partial class RecallPromptViewModel : ObservableObject
         _audioCapture = captures.FirstOrDefault(c => c.Type == CaptureType.Audio && c.IsMain
             && c.Availability == CaptureAvailability.Captured && !c.IsDeleted);
 
+        if (RecognitionEnabled && _audioCapture != null)
+            await BuildAudioRecognitionOptionsAsync(captures);
+
         // Camera tab
         _cameraCapture = captures.FirstOrDefault(c => c.Type == CaptureType.Camera && c.IsMain
             && c.Availability == CaptureAvailability.Captured && !c.IsDeleted);
+
+        if (RecognitionEnabled && _cameraCapture != null)
+            await BuildCameraRecognitionOptionsAsync(captures);
 
         BuildTabs();
         UpdateNavigation();
@@ -154,30 +175,40 @@ public partial class RecallPromptViewModel : ObservableObject
         OnPropertyChanged(nameof(NextButtonText));
     }
 
+    private const int RecognitionOptionCount = 4;
+
     private async Task BuildRecognitionOptionsAsync(List<CaptureRecord> captures)
     {
-        var decoys = captures.Where(c => c.Type == CaptureType.Screenshot && !c.IsMain && !c.IsDeleted).ToList();
-        var options = new List<RecognitionOptionViewModel>();
-
         if (_mainCapture == null) { RecognitionAvailable = false; return; }
 
-        options.Add(new RecognitionOptionViewModel
-        {
-            Capture = _mainCapture,
-            IsCorrect = true,
-            IsFileAvailable = _mainCapture.FilePath != null && File.Exists(_mainCapture.FilePath),
-            Label = $"Option A — {_mainCapture.TakenAtUtc?.ToLocalTime():HH:mm:ss}"
-        });
+        var configuredDecoys = captures
+            .Where(c => c.Type == CaptureType.Screenshot && !c.IsMain && !c.IsDeleted)
+            .ToList();
 
-        if (decoys.Count == 0)
+        // Pad to RecognitionOptionCount - 1 decoys using nearest-in-time main captures from other cycles
+        int needed = RecognitionOptionCount - 1 - configuredDecoys.Count;
+        if (needed > 0)
         {
-            var random = await _db.GetRandomAvailableScreenshotCaptureAsync(_record.Id);
-            if (random != null) decoys.Add(random);
+            var extras = await _db.GetRandomAvailableScreenshotCapturesAsync(_record.Id, needed);
+            var existingIds = configuredDecoys.Select(d => d.Id).ToHashSet();
+            configuredDecoys.AddRange(extras.Where(e => !existingIds.Contains(e.Id)));
         }
 
-        if (decoys.Count == 0) { RecognitionAvailable = false; return; }
+        // Still need at least 1 decoy to make recognition meaningful
+        if (configuredDecoys.Count == 0) { RecognitionAvailable = false; return; }
 
-        foreach (var decoy in decoys)
+        var options = new List<RecognitionOptionViewModel>
+        {
+            new RecognitionOptionViewModel
+            {
+                Capture = _mainCapture,
+                IsCorrect = true,
+                IsFileAvailable = _mainCapture.FilePath != null && File.Exists(_mainCapture.FilePath),
+                Label = string.Empty
+            }
+        };
+
+        foreach (var decoy in configuredDecoys)
         {
             options.Add(new RecognitionOptionViewModel
             {
@@ -196,10 +227,118 @@ public partial class RecallPromptViewModel : ObservableObject
         }
 
         for (int i = 0; i < options.Count; i++)
-            options[i].Label = $"Option {(char)('A' + i)} — {options[i].Capture.TakenAtUtc?.ToLocalTime():HH:mm:ss}";
+            options[i].Label = $"Option {(char)('A' + i)}";
 
-        RecognitionOptions.AddRange(options);
+        foreach (var o in options) RecognitionOptions.Add(o);
         RecognitionAvailable = true;
+    }
+
+    private async Task BuildAudioRecognitionOptionsAsync(List<CaptureRecord> captures)
+    {
+        if (_audioCapture == null) { AudioRecognitionAvailable = false; return; }
+
+        var configuredDecoys = captures
+            .Where(c => c.Type == CaptureType.Audio && !c.IsMain && c.Availability == CaptureAvailability.Captured && !c.IsDeleted)
+            .ToList();
+
+        int needed = RecognitionOptionCount - 1 - configuredDecoys.Count;
+        if (needed > 0)
+        {
+            var extras = await _db.GetRandomAvailableAudioCapturesAsync(_record.Id, needed);
+            var existingIds = configuredDecoys.Select(d => d.Id).ToHashSet();
+            configuredDecoys.AddRange(extras.Where(e => !existingIds.Contains(e.Id)));
+        }
+
+        if (configuredDecoys.Count == 0) { AudioRecognitionAvailable = false; return; }
+
+        var options = new List<RecognitionOptionViewModel>
+        {
+            new RecognitionOptionViewModel
+            {
+                Capture = _audioCapture,
+                IsCorrect = true,
+                IsFileAvailable = _audioCapture.FilePath != null && File.Exists(_audioCapture.FilePath),
+                Label = string.Empty
+            }
+        };
+
+        foreach (var decoy in configuredDecoys)
+        {
+            options.Add(new RecognitionOptionViewModel
+            {
+                Capture = decoy,
+                IsCorrect = false,
+                IsFileAvailable = decoy.FilePath != null && File.Exists(decoy.FilePath!),
+                Label = string.Empty
+            });
+        }
+
+        var rng = new Random();
+        for (int i = options.Count - 1; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            (options[i], options[j]) = (options[j], options[i]);
+        }
+
+        for (int i = 0; i < options.Count; i++)
+            options[i].Label = $"Option {(char)('A' + i)}";
+
+        foreach (var o in options) AudioRecognitionOptions.Add(o);
+        AudioRecognitionAvailable = true;
+    }
+
+    private async Task BuildCameraRecognitionOptionsAsync(List<CaptureRecord> captures)
+    {
+        if (_cameraCapture == null) { CameraRecognitionAvailable = false; return; }
+
+        var configuredDecoys = captures
+            .Where(c => c.Type == CaptureType.Camera && !c.IsMain && c.Availability == CaptureAvailability.Captured && !c.IsDeleted)
+            .ToList();
+
+        int needed = RecognitionOptionCount - 1 - configuredDecoys.Count;
+        if (needed > 0)
+        {
+            var extras = await _db.GetRandomAvailableCameraCapturesAsync(_record.Id, needed);
+            var existingIds = configuredDecoys.Select(d => d.Id).ToHashSet();
+            configuredDecoys.AddRange(extras.Where(e => !existingIds.Contains(e.Id)));
+        }
+
+        if (configuredDecoys.Count == 0) { CameraRecognitionAvailable = false; return; }
+
+        var options = new List<RecognitionOptionViewModel>
+        {
+            new RecognitionOptionViewModel
+            {
+                Capture = _cameraCapture,
+                IsCorrect = true,
+                IsFileAvailable = _cameraCapture.FilePath != null && File.Exists(_cameraCapture.FilePath),
+                Label = string.Empty
+            }
+        };
+
+        foreach (var decoy in configuredDecoys)
+        {
+            options.Add(new RecognitionOptionViewModel
+            {
+                Capture = decoy,
+                IsCorrect = false,
+                IsFileAvailable = decoy.FilePath != null && File.Exists(decoy.FilePath!),
+                Label = string.Empty
+            });
+        }
+
+        var rng = new Random();
+        for (int i = options.Count - 1; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            (options[i], options[j]) = (options[j], options[i]);
+        }
+
+        for (int i = 0; i < options.Count; i++)
+            options[i].Label = $"Option {(char)('A' + i)}";
+
+        foreach (var o in options) CameraRecognitionOptions.Add(o);
+        CameraRecognitionAvailable = true;
     }
 
     // ── Navigation ──
@@ -211,8 +350,8 @@ public partial class RecallPromptViewModel : ObservableObject
         CanGoNext = _tabs[_stepIndex] switch
         {
             "Screenshot" => IsScreenshotTabComplete,
-            "Audio" => AudioRecallCompleted,
-            "Camera" => CameraRecallCompleted,
+            "Audio" => IsAudioTabComplete,
+            "Camera" => IsCameraTabComplete,
             _ => false
         };
         OnPropertyChanged(nameof(NextButtonText));
@@ -223,6 +362,14 @@ public partial class RecallPromptViewModel : ObservableObject
     private bool IsScreenshotTabComplete =>
         (!FreeRecallEnabled || FreeRecallCompleted) &&
         (!RecognitionEnabled || !RecognitionAvailable || RecognitionCompleted);
+
+    private bool IsAudioTabComplete =>
+        AudioRecallCompleted &&
+        (!RecognitionEnabled || !AudioRecognitionAvailable || AudioRecognitionCompleted);
+
+    private bool IsCameraTabComplete =>
+        CameraRecallCompleted &&
+        (!RecognitionEnabled || !CameraRecognitionAvailable || CameraRecognitionCompleted);
 
     private void UpdateStepIndicators()
     {
@@ -249,6 +396,10 @@ public partial class RecallPromptViewModel : ObservableObject
     [RelayCommand]
     private async Task DoneAsync()
     {
+        _audioPlayer.Stop();
+        _audioPlayer.Dispose();
+        _audioOptionPlayer.Stop();
+        _audioOptionPlayer.Dispose();
         _record.PromptShownUtc = DateTime.UtcNow;
         await _engine.EvaluationCompleteAsync(_record);
         CanDismiss = true;
@@ -325,14 +476,38 @@ public partial class RecallPromptViewModel : ObservableObject
     {
         if (string.IsNullOrEmpty(AudioRecallText)) return;
         AudioIsVerified = true;
+        _audioPlayer.PlaybackStopped += () =>
+        {
+            AudioIsPlaying = false;
+        };
     }
 
     [RelayCommand]
-    private void OpenAudioCapture()
+    private void PlayPauseAudio()
     {
         if (_audioCapture?.FilePath == null || !File.Exists(_audioCapture.FilePath)) return;
-        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_audioCapture.FilePath) { UseShellExecute = true }); }
-        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[RecallPromptViewModel] Failed to open audio: {ex.Message}"); }
+        if (_audioPlayer.IsPlaying)
+        {
+            _audioPlayer.Pause();
+            AudioIsPlaying = false;
+        }
+        else if (_audioPlayer.IsPaused)
+        {
+            _audioPlayer.Resume();
+            AudioIsPlaying = true;
+        }
+        else
+        {
+            _audioPlayer.Play(_audioCapture.FilePath);
+            AudioIsPlaying = true;
+        }
+    }
+
+    [RelayCommand]
+    private void StopAudio()
+    {
+        _audioPlayer.Stop();
+        AudioIsPlaying = false;
     }
 
     [RelayCommand]
@@ -349,6 +524,64 @@ public partial class RecallPromptViewModel : ObservableObject
         };
         await _db.CreateAudioRecallResultAsync(audioResult);
         AudioRecallCompleted = true;
+        UpdateNavigation();
+    }
+
+    [RelayCommand]
+    private void PlayStopAudioOption(RecognitionOptionViewModel option)
+    {
+        // If this option is already playing, stop it
+        if (_playingAudioOption == option && _audioOptionPlayer.IsPlaying)
+        {
+            _audioOptionPlayer.Stop();
+            option.IsPlaying = false;
+            _playingAudioOption = null;
+            return;
+        }
+
+        // Stop any previously playing option
+        if (_playingAudioOption != null)
+        {
+            _audioOptionPlayer.Stop();
+            _playingAudioOption.IsPlaying = false;
+            _playingAudioOption = null;
+        }
+
+        if (!option.IsFileAvailable || option.Capture.FilePath == null) return;
+
+        _playingAudioOption = option;
+        _audioOptionPlayer.PlaybackStopped += OnAudioOptionStopped;
+        _audioOptionPlayer.Play(option.Capture.FilePath);
+        option.IsPlaying = true;
+    }
+
+    private void OnAudioOptionStopped()
+    {
+        _audioOptionPlayer.PlaybackStopped -= OnAudioOptionStopped;
+        if (_playingAudioOption != null)
+        {
+            _playingAudioOption.IsPlaying = false;
+            _playingAudioOption = null;
+        }
+    }
+
+    [RelayCommand]
+    private async Task SelectAudioOptionAsync(RecognitionOptionViewModel option)
+    {
+        foreach (var o in AudioRecognitionOptions) o.IsSelected = false;
+        option.IsSelected = true;
+
+        var correct = AudioRecognitionOptions.First(o => o.IsCorrect);
+        var result = new RecognitionResult
+        {
+            CycleRecordId = _record.Id,
+            SelectedCaptureRecordId = option.Capture.Id,
+            CorrectCaptureRecordId = correct.Capture.Id,
+            IsCorrect = option.IsCorrect,
+            EvaluatedAtUtc = DateTime.UtcNow
+        };
+        await _db.CreateRecognitionResultAsync(result);
+        AudioRecognitionCompleted = true;
         UpdateNavigation();
     }
 
@@ -383,6 +616,34 @@ public partial class RecallPromptViewModel : ObservableObject
         };
         await _db.CreateCameraRecallResultAsync(cameraResult);
         CameraRecallCompleted = true;
+        UpdateNavigation();
+    }
+
+    [RelayCommand]
+    private void OpenCameraOption(RecognitionOptionViewModel option)
+    {
+        if (!option.IsFileAvailable || option.Capture.FilePath == null) return;
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(option.Capture.FilePath) { UseShellExecute = true }); }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[RecallPromptViewModel] Failed to open camera option: {ex.Message}"); }
+    }
+
+    [RelayCommand]
+    private async Task SelectCameraOptionAsync(RecognitionOptionViewModel option)
+    {
+        foreach (var o in CameraRecognitionOptions) o.IsSelected = false;
+        option.IsSelected = true;
+
+        var correct = CameraRecognitionOptions.First(o => o.IsCorrect);
+        var result = new RecognitionResult
+        {
+            CycleRecordId = _record.Id,
+            SelectedCaptureRecordId = option.Capture.Id,
+            CorrectCaptureRecordId = correct.Capture.Id,
+            IsCorrect = option.IsCorrect,
+            EvaluatedAtUtc = DateTime.UtcNow
+        };
+        await _db.CreateRecognitionResultAsync(result);
+        CameraRecognitionCompleted = true;
         UpdateNavigation();
     }
 }

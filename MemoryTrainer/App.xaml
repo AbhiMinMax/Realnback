@@ -6,6 +6,8 @@
     <Application.Resources>
         <ResourceDictionary>
             <helpers:NullToCollapsedConverter x:Key="NullToCollapsedConverter"/>
+            <helpers:EmptyStringToCollapsedConverter x:Key="EmptyStringToCollapsed"/>
+            <helpers:BoolToExpandArrowConverter x:Key="BoolToExpandArrow"/>
             <helpers:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
             <helpers:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
             <helpers:BoolToDecoyButtonTextConverter x:Key="BoolToDecoyButtonText"/>
@@ -248,6 +250,13 @@
                         </ControlTemplate>
                     </Setter.Value>
                 </Setter>
+            </Style>
+
+            <Style TargetType="DatePicker">
+                <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
             </Style>
 
             <Style TargetType="ScrollViewer">

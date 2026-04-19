@@ -1,3 +1,5 @@
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
 using MemoryTrainer.Helpers;
 using MemoryTrainer.Services;
 using MemoryTrainer.ViewModels;
@@ -16,6 +18,8 @@ public partial class App : Application
         base.OnStartup(e);
 
         SetupGlobalExceptionHandling();
+
+        LiveCharts.Configure(config => config.AddDarkTheme());
 
         PathHelper.EnsureDataDirectories();
 

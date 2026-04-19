@@ -222,7 +222,7 @@ public class CycleRunner
             if (_config.AudioEnabled && _audioCaptureService != null)
             {
                 var audioPath = Path.Combine(PathHelper.AudioPath, _sessionId.ToString(),
-                    $"{record.Id}_audio_{DateTime.UtcNow:yyyyMMddHHmmss}.wav");
+                    $"{record.Id}_audio_{Guid.NewGuid():N}.wav");
                 _ = Task.Run(async () =>
                 {
                     var result = await _audioCaptureService.CaptureAsync(audioPath);
@@ -244,7 +244,7 @@ public class CycleRunner
             if (_config.CameraEnabled && _cameraCaptureService != null)
             {
                 var cameraPath = Path.Combine(PathHelper.CameraPath, _sessionId.ToString(),
-                    $"{record.Id}_camera_{DateTime.UtcNow:yyyyMMddHHmmss}.png");
+                    $"{record.Id}_camera_{Guid.NewGuid():N}.png");
                 var result = _cameraCaptureService.Capture(cameraPath);
                 var availability = result != null ? CaptureAvailability.Captured : CaptureAvailability.Skipped_DeviceUnavailable;
                 var cameraCapture = new CaptureRecord
@@ -291,10 +291,25 @@ public class CycleRunner
         }
     }
 
+    private List<DecoyOffset> GetEffectiveDecoyOffsets(CycleRecord record)
+    {
+        if (_decoyOffsets.Count > 0 || !_config.RecognitionEnabled)
+            return _decoyOffsets;
+
+        var rng = new Random();
+        var dMinutes = (int)Math.Max(1, TimeSpan.FromTicks(record.ActualDurationTicks).TotalMinutes);
+        int sign = rng.Next(2) == 0 ? 1 : -1;
+        return new List<DecoyOffset>
+        {
+            new() { OffsetMinutes = sign * Math.Max(1, dMinutes / 3) },
+            new() { OffsetMinutes = -dMinutes }
+        };
+    }
+
     private List<Task> ScheduleDecoys(CycleRecord record, bool resuming, CancellationToken ct)
     {
         var tasks = new List<Task>();
-        foreach (var decoy in _decoyOffsets)
+        foreach (var decoy in GetEffectiveDecoyOffsets(record))
         {
             var captureTime = record.ScheduledScreenshotUtc + TimeSpan.FromMinutes(decoy.OffsetMinutes);
             var wait = captureTime - DateTime.UtcNow;
@@ -309,6 +324,12 @@ public class CycleRunner
             }
 
             tasks.Add(CaptureDecoyAsync(record, decoy, wait, ct));
+
+            if (_config.AudioEnabled && _audioCaptureService != null)
+                tasks.Add(CaptureAudioDecoyAsync(record, decoy, wait, ct));
+
+            if (_config.CameraEnabled && _cameraCaptureService != null)
+                tasks.Add(CaptureCameraDecoyAsync(record, decoy, wait, ct));
         }
         _pausedDecoyRemaining.Clear();
         return tasks;
@@ -343,7 +364,67 @@ public class CycleRunner
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[CycleRunner:{_config.Id}] Decoy capture failed: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[CycleRunner:{_config.Id}] Decoy screenshot capture failed: {ex.Message}");
+        }
+    }
+
+    private async Task CaptureAudioDecoyAsync(CycleRecord record, DecoyOffset decoy, TimeSpan wait, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(wait, ct);
+            ct.ThrowIfCancellationRequested();
+
+            var path = Path.Combine(PathHelper.AudioPath, _sessionId.ToString(),
+                $"{record.Id}_audiodecoy_{Guid.NewGuid():N}.wav");
+            var result = await _audioCaptureService!.CaptureAsync(path);
+            var availability = result != null ? CaptureAvailability.Captured : CaptureAvailability.Skipped_NoAudio;
+            var captureRecord = new CaptureRecord
+            {
+                CycleRecordId = record.Id,
+                Type = CaptureType.Audio,
+                IsMain = false,
+                DecoyOffsetMinutes = decoy.OffsetMinutes,
+                FilePath = result,
+                TakenAtUtc = DateTime.UtcNow,
+                Availability = availability
+            };
+            await _db.CreateCaptureRecordAsync(captureRecord);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CycleRunner:{_config.Id}] Decoy audio capture failed: {ex.Message}");
+        }
+    }
+
+    private async Task CaptureCameraDecoyAsync(CycleRecord record, DecoyOffset decoy, TimeSpan wait, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(wait, ct);
+            ct.ThrowIfCancellationRequested();
+
+            var path = Path.Combine(PathHelper.CameraPath, _sessionId.ToString(),
+                $"{record.Id}_cameradecoy_{Guid.NewGuid():N}.png");
+            var result = _cameraCaptureService!.Capture(path);
+            var availability = result != null ? CaptureAvailability.Captured : CaptureAvailability.Skipped_DeviceUnavailable;
+            var captureRecord = new CaptureRecord
+            {
+                CycleRecordId = record.Id,
+                Type = CaptureType.Camera,
+                IsMain = false,
+                DecoyOffsetMinutes = decoy.OffsetMinutes,
+                FilePath = result,
+                TakenAtUtc = DateTime.UtcNow,
+                Availability = availability
+            };
+            await _db.CreateCaptureRecordAsync(captureRecord);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[CycleRunner:{_config.Id}] Decoy camera capture failed: {ex.Message}");
         }
     }
 

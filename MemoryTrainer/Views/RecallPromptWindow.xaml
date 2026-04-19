@@ -6,9 +6,13 @@
         SizeToContent="Height"
         WindowStyle="ToolWindow"
         Topmost="True"
-        ResizeMode="CanResize">
+        ResizeMode="CanResize"
+        Background="{StaticResource BackgroundBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        FontFamily="Segoe UI" FontSize="13">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20"
+                  Background="{StaticResource BackgroundBrush}">
         <StackPanel>
 
             <!-- Step indicator -->
@@ -143,9 +147,12 @@
                         Visibility="{Binding AudioIsVerified, Converter={StaticResource InverseBoolToVisibility}}"
                         Margin="0,0,0,12"/>
                 <StackPanel Visibility="{Binding AudioIsVerified, Converter={StaticResource BoolToVisibility}}">
-                    <Button Content="Open Audio" Style="{StaticResource LinkButton}"
-                            Command="{Binding OpenAudioCaptureCommand}"
-                            HorizontalAlignment="Left" Margin="0,0,0,8"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button Content="{Binding AudioPlayLabel}" Command="{Binding PlayPauseAudioCommand}"
+                                Width="90" Margin="0,0,8,0"/>
+                        <Button Content="⏹ Stop" Style="{StaticResource SecondaryButton}"
+                                Command="{Binding StopAudioCommand}" Width="70"/>
+                    </StackPanel>
                     <StackPanel Visibility="{Binding AudioRecallCompleted, Converter={StaticResource InverseBoolToVisibility}}">
                         <TextBlock Text="How accurate was your recall?" Style="{StaticResource Label}" Margin="0,0,0,6"/>
                         <StackPanel Orientation="Horizontal">
@@ -161,6 +168,38 @@
                         <Run Text="Audio recall: "/>
                         <Run Text="{Binding AudioEvalResult}" Foreground="{StaticResource SuccessBrush}"/>
                     </TextBlock>
+                </StackPanel>
+
+                <!-- Audio recognition — shown only after free recall is rated -->
+                <Separator Margin="0,12,0,12"
+                           Visibility="{Binding ShowAudioRecognition, Converter={StaticResource BoolToVisibility}}"/>
+                <StackPanel Visibility="{Binding ShowAudioRecognition, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="Which of these did you hear?" FontWeight="SemiBold" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                    <ItemsControl ItemsSource="{Binding AudioRecognitionOptions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:RecognitionOptionViewModel}">
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
+                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center" Margin="0,0,8,0" MinWidth="70"/>
+                                    <Button Content="{Binding PlayStopLabel}"
+                                            Command="{Binding DataContext.PlayStopAudioOptionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}"
+                                            IsEnabled="{Binding IsFileAvailable}"
+                                            Style="{StaticResource SecondaryButton}" Padding="8,3" Margin="0,0,8,0"/>
+                                    <TextBlock Text="(unavailable)" Foreground="{StaticResource ErrorBrush}" FontSize="11"
+                                               VerticalAlignment="Center" Margin="0,0,8,0"
+                                               Visibility="{Binding IsFileAvailable, Converter={StaticResource InverseBoolToVisibility}}"/>
+                                    <Button Content="Select"
+                                            Command="{Binding DataContext.SelectAudioOptionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}" Padding="10,4"
+                                            Visibility="{Binding DataContext.AudioRecognitionCompleted, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource InverseBoolToVisibility}}"/>
+                                    <TextBlock Margin="8,0,0,0" VerticalAlignment="Center"
+                                               Text="{Binding IsCorrect, Converter={StaticResource BoolToCorrectWrong}}"
+                                               Foreground="{Binding IsCorrect, Converter={StaticResource BoolToCorrectColor}}"
+                                               Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </StackPanel>
 
@@ -197,6 +236,36 @@
                         <Run Text="Camera recall: "/>
                         <Run Text="{Binding CameraEvalResult}" Foreground="{StaticResource SuccessBrush}"/>
                     </TextBlock>
+                </StackPanel>
+
+                <!-- Camera recognition — shown only after free recall is rated -->
+                <Separator Margin="0,12,0,12"
+                           Visibility="{Binding ShowCameraRecognition, Converter={StaticResource BoolToVisibility}}"/>
+                <StackPanel Visibility="{Binding ShowCameraRecognition, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="Which of these was your camera view?" FontWeight="SemiBold" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                    <ItemsControl ItemsSource="{Binding CameraRecognitionOptions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:RecognitionOptionViewModel}">
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
+                                    <Button Content="{Binding Label}" Style="{StaticResource LinkButton}"
+                                            Command="{Binding DataContext.OpenCameraOptionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}"
+                                            IsEnabled="{Binding IsFileAvailable}" Margin="0,0,12,0"/>
+                                    <TextBlock Text="(unavailable)" Foreground="{StaticResource ErrorBrush}" FontSize="11"
+                                               VerticalAlignment="Center" Margin="0,0,8,0"
+                                               Visibility="{Binding IsFileAvailable, Converter={StaticResource InverseBoolToVisibility}}"/>
+                                    <Button Content="Select"
+                                            Command="{Binding DataContext.SelectCameraOptionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}" Padding="10,4"
+                                            Visibility="{Binding DataContext.CameraRecognitionCompleted, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource InverseBoolToVisibility}}"/>
+                                    <TextBlock Margin="8,0,0,0" VerticalAlignment="Center"
+                                               Text="{Binding IsCorrect, Converter={StaticResource BoolToCorrectWrong}}"
+                                               Foreground="{Binding IsCorrect, Converter={StaticResource BoolToCorrectColor}}"
+                                               Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </StackPanel>
 

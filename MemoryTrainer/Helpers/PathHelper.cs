@@ -11,6 +11,7 @@ public static class PathHelper
     public static string SettingsFilePath => Path.Combine(DataFolder, "appsettings.json");
 
     private static string? _screenshotsPathOverride;
+    private static string? _defaultSessionNameTemplate;
 
     public static string ScreenshotsPath
     {
@@ -19,6 +20,16 @@ public static class PathHelper
         {
             _screenshotsPathOverride = string.IsNullOrWhiteSpace(value) ? null : value;
             Directory.CreateDirectory(ScreenshotsPath);
+            SaveSettings();
+        }
+    }
+
+    public static string DefaultSessionNameTemplate
+    {
+        get => _defaultSessionNameTemplate ?? "Session — {date} {time}";
+        set
+        {
+            _defaultSessionNameTemplate = string.IsNullOrWhiteSpace(value) ? null : value;
             SaveSettings();
         }
     }
@@ -48,6 +59,12 @@ public static class PathHelper
                 if (!string.IsNullOrWhiteSpace(val))
                     _screenshotsPathOverride = val;
             }
+            if (doc.RootElement.TryGetProperty("DefaultSessionNameTemplate", out var el2))
+            {
+                var val = el2.GetString();
+                if (!string.IsNullOrWhiteSpace(val))
+                    _defaultSessionNameTemplate = val;
+            }
         }
         catch (Exception ex)
         {
@@ -59,7 +76,7 @@ public static class PathHelper
     {
         try
         {
-            var settings = new { ScreenshotsPath = _screenshotsPathOverride };
+            var settings = new { ScreenshotsPath = _screenshotsPathOverride, DefaultSessionNameTemplate = _defaultSessionNameTemplate };
             var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(SettingsFilePath, json);
         }

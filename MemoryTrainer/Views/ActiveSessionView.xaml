@@ -53,6 +53,8 @@
 
         <!-- Action buttons -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="20,8,20,20" HorizontalAlignment="Right">
+            <Button Content="History" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0"
+                    Command="{Binding ShowHistoryCommand}"/>
             <Button Content="{Binding IsPaused, Converter={StaticResource BoolToPauseResume}}"
                     Style="{StaticResource SecondaryButton}" Margin="0,0,10,0"
                     Command="{Binding TogglePauseCommand}"/>

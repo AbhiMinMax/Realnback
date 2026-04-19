@@ -31,15 +31,14 @@ public partial class MainViewModel : ObservableObject
 
     public void ShowActiveSession()
     {
-        CurrentView = new ActiveSessionViewModel(_engine, () =>
-        {
-            ShowConfig();
-        });
+        CurrentView = new ActiveSessionViewModel(_engine,
+            onSessionStopped: () => ShowConfig(),
+            onShowHistory: () => ShowHistory(backAction: ShowActiveSession));
     }
 
-    public void ShowHistory()
+    public void ShowHistory(Action? backAction = null)
     {
-        CurrentView = new HistoryViewModel(_db, _cleanupService, () => ShowConfig());
+        CurrentView = new HistoryViewModel(_db, _cleanupService, backAction ?? (() => ShowConfig()));
     }
 
     public void ShowSettings()

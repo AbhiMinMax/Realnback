@@ -499,6 +499,39 @@ public class DatabaseService
         return MapCaptureRecord(row);
     }
 
+    public async Task<List<CaptureRecord>> GetRandomAvailableScreenshotCapturesAsync(int excludeCycleRecordId, int count)
+    {
+        using var conn = OpenConnection();
+        var rows = await conn.QueryAsync(@"
+            SELECT * FROM CaptureRecords
+            WHERE IsDeleted = 0 AND Type = @Type AND CycleRecordId != @ExcludeCycleRecordId
+            ORDER BY RANDOM() LIMIT @Count",
+            new { ExcludeCycleRecordId = excludeCycleRecordId, Type = (int)CaptureType.Screenshot, Count = count });
+        return rows.Select<dynamic, CaptureRecord>(r => MapCaptureRecord(r)).ToList();
+    }
+
+    public async Task<List<CaptureRecord>> GetRandomAvailableAudioCapturesAsync(int excludeCycleRecordId, int count)
+    {
+        using var conn = OpenConnection();
+        var rows = await conn.QueryAsync(@"
+            SELECT * FROM CaptureRecords
+            WHERE IsDeleted = 0 AND Type = @Type AND Availability = @Avail AND CycleRecordId != @ExcludeCycleRecordId
+            ORDER BY RANDOM() LIMIT @Count",
+            new { ExcludeCycleRecordId = excludeCycleRecordId, Type = (int)CaptureType.Audio, Avail = (int)CaptureAvailability.Captured, Count = count });
+        return rows.Select<dynamic, CaptureRecord>(r => MapCaptureRecord(r)).ToList();
+    }
+
+    public async Task<List<CaptureRecord>> GetRandomAvailableCameraCapturesAsync(int excludeCycleRecordId, int count)
+    {
+        using var conn = OpenConnection();
+        var rows = await conn.QueryAsync(@"
+            SELECT * FROM CaptureRecords
+            WHERE IsDeleted = 0 AND Type = @Type AND Availability = @Avail AND CycleRecordId != @ExcludeCycleRecordId
+            ORDER BY RANDOM() LIMIT @Count",
+            new { ExcludeCycleRecordId = excludeCycleRecordId, Type = (int)CaptureType.Camera, Avail = (int)CaptureAvailability.Captured, Count = count });
+        return rows.Select<dynamic, CaptureRecord>(r => MapCaptureRecord(r)).ToList();
+    }
+
     public async Task MarkCaptureDeletedAsync(int captureId)
     {
         await RetryAsync(async () =>
@@ -678,7 +711,7 @@ public class DatabaseService
         using var conn = OpenConnection();
         var sql = BuildHistoryQuery(filters);
         var rows = await conn.QueryAsync(sql.sql, sql.param);
-        return rows.Select(r => (CycleRecordHistoryRow)MapHistoryRow(r)).ToList();
+        return rows.Select<dynamic, CycleRecordHistoryRow>(r => MapHistoryRow(r)).ToList();
     }
 
     private static CycleRecordHistoryRow MapHistoryRow(dynamic r)
@@ -710,10 +743,14 @@ public class DatabaseService
         var conditions = new List<string>();
         var p = new DynamicParameters();
 
-        if (f.FromUtc.HasValue) { conditions.Add("cr.ScreenshotTakenUtc >= @From"); p.Add("From", f.FromUtc.Value.ToString("O")); }
-        if (f.ToUtc.HasValue) { conditions.Add("cr.ScreenshotTakenUtc <= @To"); p.Add("To", f.ToUtc.Value.ToString("O")); }
+        if (f.FromUtc.HasValue) { conditions.Add("COALESCE(cr.ScreenshotTakenUtc, cr.CycleStartUtc) >= @From"); p.Add("From", f.FromUtc.Value.ToString("O")); }
+        if (f.ToUtc.HasValue) { conditions.Add("COALESCE(cr.ScreenshotTakenUtc, cr.CycleStartUtc) <= @To"); p.Add("To", f.ToUtc.Value.ToString("O")); }
         if (f.SessionId.HasValue) { conditions.Add("s.Id = @SessionId"); p.Add("SessionId", f.SessionId.Value); }
-        if (!f.ShowMissed) conditions.Add("cr.Status != @MissedStatus");
+        if (!f.ShowMissed)
+        {
+            conditions.Add("cr.Status != @MissedStatus");
+            conditions.Add("(fr.Result IS NOT NULL OR rr.IsCorrect IS NOT NULL OR ar.Result IS NOT NULL OR camr.Result IS NOT NULL)");
+        }
         p.Add("MissedStatus", (int)CycleStatus.Missed);
 
         if (f.DurationTicksList != null && f.DurationTicksList.Count > 0)

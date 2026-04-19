@@ -65,6 +65,15 @@ public partial class HistoryViewModel : ObservableObject
     [ObservableProperty] private ObservableCollection<SessionModel> _sessions = new();
     [ObservableProperty] private SessionModel? _selectedSession;
     [ObservableProperty] private List<string> _durationSlots = new();
+    [ObservableProperty] private bool _isCustomDateRange;
+
+    public ObservableCollection<SessionFilterOption> SessionFilterOptions { get; } = new();
+
+    [ObservableProperty] private SessionFilterOption? _selectedSessionOption;
+    partial void OnSelectedSessionOptionChanged(SessionFilterOption? value)
+    {
+        SelectedSession = value?.Session;
+    }
 
     public ObservableCollection<HistoryRowViewModel> Rows { get; } = new();
     public ISeries[] ChartSeries { get; private set; } = Array.Empty<ISeries>();
@@ -82,6 +91,12 @@ public partial class HistoryViewModel : ObservableObject
     {
         var allSessions = await _db.GetAllSessionsAsync();
         Sessions = new ObservableCollection<SessionModel>(allSessions);
+
+        SessionFilterOptions.Clear();
+        SessionFilterOptions.Add(new SessionFilterOption("All Sessions", null));
+        foreach (var s in allSessions)
+            SessionFilterOptions.Add(new SessionFilterOption(s.Name, s));
+        SelectedSessionOption = SessionFilterOptions[0];
 
         var durationTicks = await _db.GetDistinctDurationTicksAsync();
         DurationSlots = durationTicks.Select(t => TimeFormatter.FormatDuration(TimeSpan.FromTicks(t))).ToList();
@@ -117,7 +132,9 @@ public partial class HistoryViewModel : ObservableObject
                 CameraResult = cameraResult,
                 FreeRecallTextShort = text.Length > 80 ? text[..80] + "…" : text,
                 FreeRecallTextFull = text,
-                IsMissed = r.Status == CycleStatus.Missed,
+                IsMissed = r.Status == CycleStatus.Missed
+                    || (r.FreeRecallResult == null && r.RecognitionCorrect == null
+                        && r.AudioRecallResult == null && r.CameraRecallResult == null),
             });
         }
 
@@ -303,11 +320,19 @@ public partial class HistoryViewModel : ObservableObject
     [RelayCommand]
     private void GoBack() => _onBack();
 
-    partial void OnDatePresetChanged(string value) => _ = RefreshAsync();
+    partial void OnDatePresetChanged(string value)
+    {
+        IsCustomDateRange = value == "Custom";
+        _ = RefreshAsync();
+    }
     partial void OnShowMissedChanged(bool value) => _ = RefreshAsync();
     partial void OnRecallModeFilterChanged(string value) => _ = RefreshAsync();
     partial void OnCaptureTypeFilterChanged(string value) => _ = RefreshAsync();
     partial void OnSortByChanged(string value) => _ = RefreshAsync();
     partial void OnSortDescChanged(bool value) => _ = RefreshAsync();
     partial void OnSelectedSessionChanged(SessionModel? value) => _ = RefreshAsync();
+    partial void OnCustomFromChanged(DateTime value) => _ = RefreshAsync();
+    partial void OnCustomToChanged(DateTime value) => _ = RefreshAsync();
 }
+
+public record SessionFilterOption(string DisplayName, SessionModel? Session);

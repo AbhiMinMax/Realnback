@@ -24,60 +24,75 @@
         </Grid>
 
         <!-- Filter bar -->
-        <WrapPanel Grid.Row="1" Margin="20,0,20,8" Orientation="Horizontal">
-            <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
-                <TextBlock Text="Date:" Style="{StaticResource Label}" Margin="0,0,6,0"
-                           ToolTip="Filter results to a time range. Day = last 24 h, Week = last 7 days, etc."/>
-                <ComboBox SelectedValue="{Binding DatePreset}" SelectedValuePath="Content" Width="80">
-                    <ComboBoxItem>Day</ComboBoxItem>
-                    <ComboBoxItem>Week</ComboBoxItem>
-                    <ComboBoxItem>Month</ComboBoxItem>
-                    <ComboBoxItem>Year</ComboBoxItem>
-                    <ComboBoxItem>Custom</ComboBoxItem>
-                </ComboBox>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,0,12,4"
-                        Visibility="{Binding DatePreset, Converter={StaticResource NullToCollapsedConverter}}">
-                <TextBlock Text="Show Missed:" Style="{StaticResource Label}" Margin="0,0,6,0"
-                           ToolTip="Missed cycles are ones where the app was closed before the screenshot could be taken. Off by default because they don't have recall data."/>
-                <CheckBox IsChecked="{Binding ShowMissed}" VerticalAlignment="Center"/>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
-                <TextBlock Text="Mode:" Style="{StaticResource Label}" Margin="0,0,6,0"
-                           ToolTip="Filter by recall mode: Free Recall (written recall you self-evaluated) or Recognition (screenshot selection task)."/>
-                <ComboBox SelectedValue="{Binding RecallModeFilter}" SelectedValuePath="Content" Width="110">
-                    <ComboBoxItem>All</ComboBoxItem>
-                    <ComboBoxItem>Free Recall</ComboBoxItem>
-                    <ComboBoxItem>Recognition</ComboBoxItem>
-                </ComboBox>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
-                <TextBlock Text="Capture:" Style="{StaticResource Label}" Margin="0,0,6,0"
-                           ToolTip="Filter by capture type enabled for that cycle."/>
-                <ComboBox SelectedValue="{Binding CaptureTypeFilter}" SelectedValuePath="Content" Width="110">
-                    <ComboBoxItem>All</ComboBoxItem>
-                    <ComboBoxItem>Screenshot</ComboBoxItem>
-                    <ComboBoxItem>Audio</ComboBoxItem>
-                    <ComboBoxItem>Camera</ComboBoxItem>
-                </ComboBox>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
+        <Grid Grid.Row="1" Margin="20,0,20,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <!-- Left: all filters -->
+            <WrapPanel Grid.Column="0" Orientation="Horizontal">
+                <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
+                    <TextBlock Text="Date:" Style="{StaticResource Label}" Margin="0,0,6,0"
+                               ToolTip="Filter results to a time range. Day = last 24 h, Week = last 7 days, etc."/>
+                    <ComboBox SelectedValue="{Binding DatePreset}" SelectedValuePath="Content" Width="80">
+                        <ComboBoxItem>Day</ComboBoxItem>
+                        <ComboBoxItem IsSelected="True">Week</ComboBoxItem>
+                        <ComboBoxItem>Month</ComboBoxItem>
+                        <ComboBoxItem>Year</ComboBoxItem>
+                        <ComboBoxItem>Custom</ComboBoxItem>
+                    </ComboBox>
+                </StackPanel>
+                <!-- Custom date range pickers -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,12,4"
+                            Visibility="{Binding IsCustomDateRange, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="From:" Style="{StaticResource Label}" Margin="0,0,6,0"/>
+                    <DatePicker SelectedDate="{Binding CustomFrom}" Width="120"/>
+                    <TextBlock Text="To:" Style="{StaticResource Label}" Margin="8,0,6,0"/>
+                    <DatePicker SelectedDate="{Binding CustomTo}" Width="120"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
+                    <TextBlock Text="Show Missed:" Style="{StaticResource Label}" Margin="0,0,6,0"
+                               ToolTip="Missed cycles are ones where the app was closed before the screenshot could be taken."/>
+                    <CheckBox IsChecked="{Binding ShowMissed}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
+                    <TextBlock Text="Mode:" Style="{StaticResource Label}" Margin="0,0,6,0"
+                               ToolTip="Filter by recall mode."/>
+                    <ComboBox SelectedValue="{Binding RecallModeFilter}" SelectedValuePath="Content" Width="110">
+                        <ComboBoxItem IsSelected="True">All</ComboBoxItem>
+                        <ComboBoxItem>Free Recall</ComboBoxItem>
+                        <ComboBoxItem>Recognition</ComboBoxItem>
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
+                    <TextBlock Text="Capture:" Style="{StaticResource Label}" Margin="0,0,6,0"
+                               ToolTip="Filter by capture type enabled for that cycle."/>
+                    <ComboBox SelectedValue="{Binding CaptureTypeFilter}" SelectedValuePath="Content" Width="110">
+                        <ComboBoxItem IsSelected="True">All</ComboBoxItem>
+                        <ComboBoxItem>Screenshot</ComboBoxItem>
+                        <ComboBoxItem>Audio</ComboBoxItem>
+                        <ComboBoxItem>Camera</ComboBoxItem>
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Session:" Style="{StaticResource Label}" Margin="0,0,6,0"
+                               ToolTip="Narrow results to a specific session."/>
+                    <ComboBox ItemsSource="{Binding SessionFilterOptions}"
+                              SelectedItem="{Binding SelectedSessionOption}"
+                              DisplayMemberPath="DisplayName" Width="160"/>
+                </StackPanel>
+            </WrapPanel>
+            <!-- Right: sort -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Top">
                 <TextBlock Text="Sort:" Style="{StaticResource Label}" Margin="0,0,6,0"
-                           ToolTip="Sort the detail list by date, duration slot, or recall result."/>
-                <ComboBox SelectedValue="{Binding SortBy}" SelectedValuePath="Content" Width="80">
-                    <ComboBoxItem>Date</ComboBoxItem>
+                           ToolTip="Sort by date, duration, or recall result."/>
+                <ComboBox SelectedValue="{Binding SortBy}" SelectedValuePath="Content" Width="90">
+                    <ComboBoxItem IsSelected="True">Date</ComboBoxItem>
                     <ComboBoxItem>Duration</ComboBoxItem>
                     <ComboBoxItem>Result</ComboBoxItem>
                 </ComboBox>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
-                <TextBlock Text="Session:" Style="{StaticResource Label}" Margin="0,0,6,0"
-                           ToolTip="Narrow results to a specific session. Leave blank to show all sessions."/>
-                <ComboBox ItemsSource="{Binding Sessions}"
-                          SelectedItem="{Binding SelectedSession}"
-                          DisplayMemberPath="Name" Width="160"/>
-            </StackPanel>
-        </WrapPanel>
+        </Grid>
 
         <!-- Aggregation panel -->
         <Border Grid.Row="2" Style="{StaticResource Card}" Margin="20,0,20,8">
@@ -207,8 +222,11 @@
                                                    Foreground="{Binding CameraResult, Converter={StaticResource EvalResultToColor}}"/>
                                         <TextBlock Grid.Column="8" Text="{Binding FreeRecallTextShort}"
                                                    Style="{StaticResource Label}" TextTrimming="CharacterEllipsis"/>
-                                        <Button Grid.Column="9" Content="▼" Style="{StaticResource SecondaryButton}"
+                                        <Button Grid.Column="9"
+                                                Content="{Binding IsExpanded, Converter={StaticResource BoolToExpandArrow}}"
+                                                Style="{StaticResource SecondaryButton}"
                                                 Padding="4,2" FontSize="10"
+                                                Visibility="{Binding FreeRecallTextFull, Converter={StaticResource EmptyStringToCollapsed}}"
                                                 Click="OnExpandRow"/>
                                     </Grid>
                                     <!-- Expanded row -->

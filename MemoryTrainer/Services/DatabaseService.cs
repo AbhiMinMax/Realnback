@@ -38,6 +38,8 @@ public class DatabaseService
                 DriftMinutes        INTEGER NOT NULL DEFAULT 0,
                 FreeRecallEnabled   INTEGER NOT NULL DEFAULT 1,
                 RecognitionEnabled  INTEGER NOT NULL DEFAULT 1,
+                AudioEnabled        INTEGER NOT NULL DEFAULT 0,
+                CameraEnabled       INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY (SessionId) REFERENCES Sessions(Id)
             );
 
@@ -75,6 +77,19 @@ public class DatabaseService
                 FOREIGN KEY (CycleRecordId) REFERENCES CycleRecords(Id)
             );
 
+            CREATE TABLE IF NOT EXISTS CaptureRecords (
+                Id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                CycleRecordId       INTEGER NOT NULL,
+                Type                INTEGER NOT NULL,
+                IsMain              INTEGER NOT NULL DEFAULT 1,
+                DecoyOffsetMinutes  INTEGER,
+                FilePath            TEXT,
+                TakenAtUtc          TEXT,
+                Availability        INTEGER NOT NULL DEFAULT 0,
+                IsDeleted           INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (CycleRecordId) REFERENCES CycleRecords(Id)
+            );
+
             CREATE TABLE IF NOT EXISTS FreeRecallResults (
                 Id              INTEGER PRIMARY KEY AUTOINCREMENT,
                 CycleRecordId   INTEGER NOT NULL UNIQUE,
@@ -94,12 +109,43 @@ public class DatabaseService
                 FOREIGN KEY (CycleRecordId) REFERENCES CycleRecords(Id)
             );
 
+            CREATE TABLE IF NOT EXISTS AudioRecallResults (
+                Id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                CycleRecordId   INTEGER NOT NULL UNIQUE,
+                RecallText      TEXT NOT NULL,
+                Result          INTEGER NOT NULL,
+                EvaluatedAtUtc  TEXT NOT NULL,
+                FOREIGN KEY (CycleRecordId) REFERENCES CycleRecords(Id)
+            );
+
+            CREATE TABLE IF NOT EXISTS CameraRecallResults (
+                Id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                CycleRecordId   INTEGER NOT NULL UNIQUE,
+                RecallText      TEXT NOT NULL,
+                Result          INTEGER NOT NULL,
+                EvaluatedAtUtc  TEXT NOT NULL,
+                FOREIGN KEY (CycleRecordId) REFERENCES CycleRecords(Id)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_cyclerecords_configid ON CycleRecords(SessionCycleConfigId);
             CREATE INDEX IF NOT EXISTS idx_cyclerecords_status ON CycleRecords(Status);
             CREATE INDEX IF NOT EXISTS idx_screenshots_cyclerecordid ON ScreenshotRecords(CycleRecordId);
+            CREATE INDEX IF NOT EXISTS idx_capturerecords_cyclerecordid ON CaptureRecords(CycleRecordId);
             CREATE INDEX IF NOT EXISTS idx_freerecall_cyclerecordid ON FreeRecallResults(CycleRecordId);
             CREATE INDEX IF NOT EXISTS idx_recognition_cyclerecordid ON RecognitionResults(CycleRecordId);
+            CREATE INDEX IF NOT EXISTS idx_audiorecall_cyclerecordid ON AudioRecallResults(CycleRecordId);
+            CREATE INDEX IF NOT EXISTS idx_camerarecall_cyclerecordid ON CameraRecallResults(CycleRecordId);
         ");
+
+        // Migrations for existing DBs — ignore if column already exists
+        TryMigrate(conn, "ALTER TABLE SessionCycleConfigs ADD COLUMN AudioEnabled INTEGER NOT NULL DEFAULT 0");
+        TryMigrate(conn, "ALTER TABLE SessionCycleConfigs ADD COLUMN CameraEnabled INTEGER NOT NULL DEFAULT 0");
+    }
+
+    private static void TryMigrate(SqliteConnection conn, string sql)
+    {
+        try { conn.Execute(sql); }
+        catch (SqliteException) { }
     }
 
     private async Task<T> RetryAsync<T>(Func<Task<T>> action)
@@ -192,10 +238,15 @@ public class DatabaseService
         await RetryAsync(async () =>
         {
             using var conn = OpenConnection();
-            await conn.ExecuteAsync("DELETE FROM RecognitionResults WHERE CycleRecordId IN (SELECT Id FROM CycleRecords WHERE SessionCycleConfigId IN (SELECT Id FROM SessionCycleConfigs WHERE SessionId = @Id))", new { Id = sessionId });
-            await conn.ExecuteAsync("DELETE FROM FreeRecallResults WHERE CycleRecordId IN (SELECT Id FROM CycleRecords WHERE SessionCycleConfigId IN (SELECT Id FROM SessionCycleConfigs WHERE SessionId = @Id))", new { Id = sessionId });
-            await conn.ExecuteAsync("DELETE FROM ScreenshotRecords WHERE CycleRecordId IN (SELECT Id FROM CycleRecords WHERE SessionCycleConfigId IN (SELECT Id FROM SessionCycleConfigs WHERE SessionId = @Id))", new { Id = sessionId });
-            await conn.ExecuteAsync("DELETE FROM CycleRecords WHERE SessionCycleConfigId IN (SELECT Id FROM SessionCycleConfigs WHERE SessionId = @Id)", new { Id = sessionId });
+            var cycleIds = @"SELECT Id FROM CycleRecords WHERE SessionCycleConfigId IN
+                             (SELECT Id FROM SessionCycleConfigs WHERE SessionId = @Id)";
+            await conn.ExecuteAsync($"DELETE FROM AudioRecallResults WHERE CycleRecordId IN ({cycleIds})", new { Id = sessionId });
+            await conn.ExecuteAsync($"DELETE FROM CameraRecallResults WHERE CycleRecordId IN ({cycleIds})", new { Id = sessionId });
+            await conn.ExecuteAsync($"DELETE FROM RecognitionResults WHERE CycleRecordId IN ({cycleIds})", new { Id = sessionId });
+            await conn.ExecuteAsync($"DELETE FROM FreeRecallResults WHERE CycleRecordId IN ({cycleIds})", new { Id = sessionId });
+            await conn.ExecuteAsync($"DELETE FROM CaptureRecords WHERE CycleRecordId IN ({cycleIds})", new { Id = sessionId });
+            await conn.ExecuteAsync($"DELETE FROM ScreenshotRecords WHERE CycleRecordId IN ({cycleIds})", new { Id = sessionId });
+            await conn.ExecuteAsync($"DELETE FROM CycleRecords WHERE SessionCycleConfigId IN (SELECT Id FROM SessionCycleConfigs WHERE SessionId = @Id)", new { Id = sessionId });
             await conn.ExecuteAsync("DELETE FROM DecoyOffsets WHERE SessionCycleConfigId IN (SELECT Id FROM SessionCycleConfigs WHERE SessionId = @Id)", new { Id = sessionId });
             await conn.ExecuteAsync("DELETE FROM SessionCycleConfigs WHERE SessionId = @Id", new { Id = sessionId });
             await conn.ExecuteAsync("DELETE FROM Sessions WHERE Id = @Id", new { Id = sessionId });
@@ -224,8 +275,12 @@ public class DatabaseService
         {
             using var conn = OpenConnection();
             return await conn.ExecuteScalarAsync<int>(@"
-                INSERT INTO SessionCycleConfigs (SessionId, BaseDurationTicks, WaitingWindowTicks, DriftMinutes, FreeRecallEnabled, RecognitionEnabled)
-                VALUES (@SessionId, @BaseDurationTicks, @WaitingWindowTicks, @DriftMinutes, @FreeRecallEnabled, @RecognitionEnabled);
+                INSERT INTO SessionCycleConfigs
+                    (SessionId, BaseDurationTicks, WaitingWindowTicks, DriftMinutes,
+                     FreeRecallEnabled, RecognitionEnabled, AudioEnabled, CameraEnabled)
+                VALUES
+                    (@SessionId, @BaseDurationTicks, @WaitingWindowTicks, @DriftMinutes,
+                     @FreeRecallEnabled, @RecognitionEnabled, @AudioEnabled, @CameraEnabled);
                 SELECT last_insert_rowid();",
                 new
                 {
@@ -234,7 +289,9 @@ public class DatabaseService
                     config.WaitingWindowTicks,
                     config.DriftMinutes,
                     FreeRecallEnabled = config.FreeRecallEnabled ? 1 : 0,
-                    RecognitionEnabled = config.RecognitionEnabled ? 1 : 0
+                    RecognitionEnabled = config.RecognitionEnabled ? 1 : 0,
+                    AudioEnabled = config.AudioEnabled ? 1 : 0,
+                    CameraEnabled = config.CameraEnabled ? 1 : 0,
                 });
         });
     }
@@ -252,6 +309,8 @@ public class DatabaseService
             DriftMinutes = (int)r.DriftMinutes,
             FreeRecallEnabled = (long)r.FreeRecallEnabled == 1,
             RecognitionEnabled = (long)r.RecognitionEnabled == 1,
+            AudioEnabled = (long)r.AudioEnabled == 1,
+            CameraEnabled = (long)r.CameraEnabled == 1,
         }).ToList();
     }
 
@@ -374,77 +433,102 @@ public class DatabaseService
         };
     }
 
-    // ── ScreenshotRecords ──
+    // ── CaptureRecords ──
 
-    public async Task<int> CreateScreenshotRecordAsync(ScreenshotRecord record)
+    public async Task<int> CreateCaptureRecordAsync(CaptureRecord record)
     {
         return await RetryAsync(async () =>
         {
             using var conn = OpenConnection();
             return await conn.ExecuteScalarAsync<int>(@"
-                INSERT INTO ScreenshotRecords (CycleRecordId, FilePath, TakenAtUtc, IsMain, OffsetMinutes, IsDeleted)
-                VALUES (@CycleRecordId, @FilePath, @TakenAtUtc, @IsMain, @OffsetMinutes, 0);
+                INSERT INTO CaptureRecords (CycleRecordId, Type, IsMain, DecoyOffsetMinutes, FilePath, TakenAtUtc, Availability, IsDeleted)
+                VALUES (@CycleRecordId, @Type, @IsMain, @DecoyOffsetMinutes, @FilePath, @TakenAtUtc, @Availability, 0);
                 SELECT last_insert_rowid();",
                 new
                 {
                     record.CycleRecordId,
-                    record.FilePath,
-                    TakenAtUtc = record.TakenAtUtc.ToString("O"),
+                    Type = (int)record.Type,
                     IsMain = record.IsMain ? 1 : 0,
-                    record.OffsetMinutes
+                    record.DecoyOffsetMinutes,
+                    record.FilePath,
+                    TakenAtUtc = record.TakenAtUtc?.ToString("O"),
+                    Availability = (int)record.Availability,
                 });
         });
     }
 
-    public async Task<List<ScreenshotRecord>> GetScreenshotsByCycleAsync(int cycleRecordId)
+    public async Task<List<CaptureRecord>> GetCapturesByCycleAsync(int cycleRecordId)
     {
         using var conn = OpenConnection();
-        var rows = await conn.QueryAsync("SELECT * FROM ScreenshotRecords WHERE CycleRecordId = @CycleRecordId", new { CycleRecordId = cycleRecordId });
-        return rows.Select(r => (ScreenshotRecord)MapScreenshotRecord(r)).ToList();
+        var rows = await conn.QueryAsync("SELECT * FROM CaptureRecords WHERE CycleRecordId = @CycleRecordId", new { CycleRecordId = cycleRecordId });
+        return rows.Select<dynamic, CaptureRecord>(r => MapCaptureRecord(r)).ToList();
     }
 
-    public async Task<List<ScreenshotRecord>> GetScreenshotsByCycleConfigAsync(int configId)
+    public async Task<List<CaptureRecord>> GetCapturesByConfigAsync(int configId)
     {
         using var conn = OpenConnection();
         var rows = await conn.QueryAsync(@"
-            SELECT s.* FROM ScreenshotRecords s
-            INNER JOIN CycleRecords c ON c.Id = s.CycleRecordId
-            WHERE c.SessionCycleConfigId = @ConfigId",
+            SELECT c.* FROM CaptureRecords c
+            INNER JOIN CycleRecords cr ON cr.Id = c.CycleRecordId
+            WHERE cr.SessionCycleConfigId = @ConfigId",
             new { ConfigId = configId });
-        return rows.Select(r => (ScreenshotRecord)MapScreenshotRecord(r)).ToList();
+        return rows.Select<dynamic, CaptureRecord>(r => MapCaptureRecord(r)).ToList();
     }
 
-    public async Task<ScreenshotRecord?> GetRandomAvailableScreenshotAsync(int excludeCycleRecordId)
+    public async Task<List<CaptureRecord>> GetCapturesBySessionAsync(int sessionId)
+    {
+        using var conn = OpenConnection();
+        var rows = await conn.QueryAsync(@"
+            SELECT c.* FROM CaptureRecords c
+            INNER JOIN CycleRecords cr ON cr.Id = c.CycleRecordId
+            INNER JOIN SessionCycleConfigs scc ON scc.Id = cr.SessionCycleConfigId
+            WHERE scc.SessionId = @SessionId AND c.IsDeleted = 0",
+            new { SessionId = sessionId });
+        return rows.Select<dynamic, CaptureRecord>(r => MapCaptureRecord(r)).ToList();
+    }
+
+    public async Task<CaptureRecord?> GetRandomAvailableScreenshotCaptureAsync(int excludeCycleRecordId)
     {
         using var conn = OpenConnection();
         var row = await conn.QueryFirstOrDefaultAsync(@"
-            SELECT * FROM ScreenshotRecords
-            WHERE IsDeleted = 0 AND CycleRecordId != @ExcludeCycleRecordId
+            SELECT * FROM CaptureRecords
+            WHERE IsDeleted = 0 AND Type = @Type AND IsMain = 0 AND CycleRecordId != @ExcludeCycleRecordId
             ORDER BY RANDOM() LIMIT 1",
-            new { ExcludeCycleRecordId = excludeCycleRecordId });
+            new { ExcludeCycleRecordId = excludeCycleRecordId, Type = (int)CaptureType.Screenshot });
         if (row == null) return null;
-        return MapScreenshotRecord(row);
+        return MapCaptureRecord(row);
     }
 
-    public async Task MarkScreenshotDeletedAsync(int screenshotId)
+    public async Task MarkCaptureDeletedAsync(int captureId)
     {
         await RetryAsync(async () =>
         {
             using var conn = OpenConnection();
-            await conn.ExecuteAsync("UPDATE ScreenshotRecords SET IsDeleted = 1 WHERE Id = @Id", new { Id = screenshotId });
+            await conn.ExecuteAsync("UPDATE CaptureRecords SET IsDeleted = 1 WHERE Id = @Id", new { Id = captureId });
         });
     }
 
-    private static ScreenshotRecord MapScreenshotRecord(dynamic r)
+    public async Task MarkAllCapturesDeletedAsync()
     {
-        return new ScreenshotRecord
+        await RetryAsync(async () =>
+        {
+            using var conn = OpenConnection();
+            await conn.ExecuteAsync("UPDATE CaptureRecords SET IsDeleted = 1");
+        });
+    }
+
+    private static CaptureRecord MapCaptureRecord(dynamic r)
+    {
+        return new CaptureRecord
         {
             Id = (int)r.Id,
             CycleRecordId = (int)r.CycleRecordId,
-            FilePath = (string)r.FilePath,
-            TakenAtUtc = DateTime.Parse((string)r.TakenAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind),
+            Type = (CaptureType)(int)(long)r.Type,
             IsMain = (long)r.IsMain == 1,
-            OffsetMinutes = r.OffsetMinutes is long om ? (int?)((int)om) : null,
+            DecoyOffsetMinutes = r.DecoyOffsetMinutes is long dm ? (int?)((int)dm) : null,
+            FilePath = (string?)r.FilePath,
+            TakenAtUtc = r.TakenAtUtc != null ? DateTime.Parse((string)r.TakenAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind) : null,
+            Availability = (CaptureAvailability)(int)(long)r.Availability,
             IsDeleted = (long)r.IsDeleted == 1,
         };
     }
@@ -497,8 +581,8 @@ public class DatabaseService
                 new
                 {
                     result.CycleRecordId,
-                    result.SelectedScreenshotRecordId,
-                    result.CorrectScreenshotRecordId,
+                    SelectedScreenshotRecordId = result.SelectedCaptureRecordId,
+                    CorrectScreenshotRecordId = result.CorrectCaptureRecordId,
                     IsCorrect = result.IsCorrect ? 1 : 0,
                     EvaluatedAtUtc = result.EvaluatedAtUtc.ToString("O")
                 });
@@ -514,11 +598,51 @@ public class DatabaseService
         {
             Id = (int)row.Id,
             CycleRecordId = (int)row.CycleRecordId,
-            SelectedScreenshotRecordId = (int)row.SelectedScreenshotRecordId,
-            CorrectScreenshotRecordId = (int)row.CorrectScreenshotRecordId,
+            SelectedCaptureRecordId = (int)row.SelectedScreenshotRecordId,
+            CorrectCaptureRecordId = (int)row.CorrectScreenshotRecordId,
             IsCorrect = (long)row.IsCorrect == 1,
             EvaluatedAtUtc = DateTime.Parse((string)row.EvaluatedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind),
         };
+    }
+
+    // ── AudioRecallResults ──
+
+    public async Task CreateAudioRecallResultAsync(AudioRecallResult result)
+    {
+        await RetryAsync(async () =>
+        {
+            using var conn = OpenConnection();
+            await conn.ExecuteAsync(@"
+                INSERT INTO AudioRecallResults (CycleRecordId, RecallText, Result, EvaluatedAtUtc)
+                VALUES (@CycleRecordId, @RecallText, @Result, @EvaluatedAtUtc)",
+                new
+                {
+                    result.CycleRecordId,
+                    result.RecallText,
+                    Result = (int)result.Result,
+                    EvaluatedAtUtc = result.EvaluatedAtUtc.ToString("O")
+                });
+        });
+    }
+
+    // ── CameraRecallResults ──
+
+    public async Task CreateCameraRecallResultAsync(CameraRecallResult result)
+    {
+        await RetryAsync(async () =>
+        {
+            using var conn = OpenConnection();
+            await conn.ExecuteAsync(@"
+                INSERT INTO CameraRecallResults (CycleRecordId, RecallText, Result, EvaluatedAtUtc)
+                VALUES (@CycleRecordId, @RecallText, @Result, @EvaluatedAtUtc)",
+                new
+                {
+                    result.CycleRecordId,
+                    result.RecallText,
+                    Result = (int)result.Result,
+                    EvaluatedAtUtc = result.EvaluatedAtUtc.ToString("O")
+                });
+        });
     }
 
     // ── History Queries ──
@@ -530,28 +654,10 @@ public class DatabaseService
         int? SessionId,
         bool ShowMissed,
         RecallMode? RecallModeFilter,
+        string? CaptureTypeFilter = null,
         string SortBy = "Date",
         bool SortDesc = true
     );
-
-    public record AggregationPeriod(
-        string Label,
-        int TotalFreeRecall,
-        int CorrectFreeRecall,
-        int PartialFreeRecall,
-        int WrongFreeRecall,
-        int TotalRecognition,
-        int CorrectRecognition,
-        int WrongRecognition
-    );
-
-    public async Task<List<CycleRecordHistoryRow>> GetFilteredCycleRecordsAsync(HistoryFilters filters)
-    {
-        using var conn = OpenConnection();
-        var sql = BuildHistoryQuery(filters);
-        var rows = await conn.QueryAsync(sql.sql, sql.param);
-        return rows.Select(r => (CycleRecordHistoryRow)MapHistoryRow(r)).ToList();
-    }
 
     public record CycleRecordHistoryRow(
         int CycleRecordId,
@@ -562,13 +668,25 @@ public class DatabaseService
         EvaluationResult? FreeRecallResult,
         string? FreeRecallText,
         bool? RecognitionCorrect,
+        EvaluationResult? AudioRecallResult,
+        EvaluationResult? CameraRecallResult,
         CycleStatus Status
     );
+
+    public async Task<List<CycleRecordHistoryRow>> GetFilteredCycleRecordsAsync(HistoryFilters filters)
+    {
+        using var conn = OpenConnection();
+        var sql = BuildHistoryQuery(filters);
+        var rows = await conn.QueryAsync(sql.sql, sql.param);
+        return rows.Select(r => (CycleRecordHistoryRow)MapHistoryRow(r)).ToList();
+    }
 
     private static CycleRecordHistoryRow MapHistoryRow(dynamic r)
     {
         EvaluationResult? freeResult = r.FreeResult != null ? (EvaluationResult)(int)(long)r.FreeResult : null;
         bool? recogCorrect = r.RecogCorrect != null ? (long)r.RecogCorrect == 1 : null;
+        EvaluationResult? audioResult = r.AudioResult != null ? (EvaluationResult)(int)(long)r.AudioResult : null;
+        EvaluationResult? cameraResult = r.CameraResult != null ? (EvaluationResult)(int)(long)r.CameraResult : null;
         DateTime screenshotUtc = r.ScreenshotTakenUtc != null
             ? DateTime.Parse((string)r.ScreenshotTakenUtc, null, System.Globalization.DateTimeStyles.RoundtripKind)
             : DateTime.Parse((string)r.CycleStartUtc, null, System.Globalization.DateTimeStyles.RoundtripKind);
@@ -581,6 +699,8 @@ public class DatabaseService
             freeResult,
             (string?)r.FreeRecallText,
             recogCorrect,
+            audioResult,
+            cameraResult,
             (CycleStatus)(int)(long)r.Status
         );
     }
@@ -607,6 +727,11 @@ public class DatabaseService
         else if (f.RecallModeFilter == RecallMode.Recognition)
             conditions.Add("scc.RecognitionEnabled = 1");
 
+        if (f.CaptureTypeFilter == "Audio")
+            conditions.Add("scc.AudioEnabled = 1");
+        else if (f.CaptureTypeFilter == "Camera")
+            conditions.Add("scc.CameraEnabled = 1");
+
         string where = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
         string orderBy = f.SortBy switch
         {
@@ -620,12 +745,16 @@ public class DatabaseService
                    s.Name AS SessionName,
                    scc.BaseDurationTicks,
                    fr.Result AS FreeResult, fr.RecallText AS FreeRecallText,
-                   rr.IsCorrect AS RecogCorrect
+                   rr.IsCorrect AS RecogCorrect,
+                   ar.Result AS AudioResult,
+                   camr.Result AS CameraResult
             FROM CycleRecords cr
             INNER JOIN SessionCycleConfigs scc ON scc.Id = cr.SessionCycleConfigId
             INNER JOIN Sessions s ON s.Id = scc.SessionId
             LEFT JOIN FreeRecallResults fr ON fr.CycleRecordId = cr.Id
             LEFT JOIN RecognitionResults rr ON rr.CycleRecordId = cr.Id
+            LEFT JOIN AudioRecallResults ar ON ar.CycleRecordId = cr.Id
+            LEFT JOIN CameraRecallResults camr ON camr.CycleRecordId = cr.Id
             {where}
             ORDER BY {orderBy}";
 

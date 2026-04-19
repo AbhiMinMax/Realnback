@@ -1,3 +1,4 @@
+using MemoryTrainer.Helpers;
 using MemoryTrainer.Models;
 
 namespace MemoryTrainer.Services;
@@ -16,34 +17,64 @@ public class CleanupService
         if (cycleRecord.ScreenshotTakenUtc == null) return;
 
         var cutoffUtc = cycleRecord.ScreenshotTakenUtc.Value - TimeSpan.FromTicks(4 * cycleRecord.ActualDurationTicks);
-        var screenshots = await _db.GetScreenshotsByCycleConfigAsync(cycleRecord.SessionCycleConfigId);
+        var captures = await _db.GetCapturesByConfigAsync(cycleRecord.SessionCycleConfigId);
 
-        foreach (var screenshot in screenshots.Where(s => s.TakenAtUtc < cutoffUtc && !s.IsDeleted))
+        foreach (var capture in captures.Where(c => c.TakenAtUtc < cutoffUtc && !c.IsDeleted))
         {
             try
             {
-                if (File.Exists(screenshot.FilePath))
-                    File.Delete(screenshot.FilePath);
-                await _db.MarkScreenshotDeletedAsync(screenshot.Id);
+                if (capture.FilePath != null && File.Exists(capture.FilePath))
+                    File.Delete(capture.FilePath);
+                await _db.MarkCaptureDeletedAsync(capture.Id);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[CleanupService] Failed to delete screenshot {screenshot.Id}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[CleanupService] Failed to delete capture {capture.Id}: {ex.Message}");
             }
         }
     }
 
-    public async Task DeleteAllScreenshotsAsync(string screenshotsBasePath)
+    public async Task DeleteSessionCaptureFilesAsync(int sessionId)
     {
-        if (Directory.Exists(screenshotsBasePath))
+        var captures = await _db.GetCapturesBySessionAsync(sessionId);
+        foreach (var capture in captures)
         {
-            foreach (var file in Directory.EnumerateFiles(screenshotsBasePath, "*", SearchOption.AllDirectories))
+            try
             {
-                try { File.Delete(file); }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[CleanupService] Failed to delete {file}: {ex.Message}");
-                }
+                if (capture.FilePath != null && File.Exists(capture.FilePath))
+                    File.Delete(capture.FilePath);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[CleanupService] Failed to delete capture file {capture.FilePath}: {ex.Message}");
+            }
+            await _db.MarkCaptureDeletedAsync(capture.Id);
+        }
+    }
+
+    public async Task DeleteAllCapturedMediaAsync()
+    {
+        DeleteFolder(PathHelper.ScreenshotsPath);
+        DeleteFolder(PathHelper.AudioPath);
+        DeleteFolder(PathHelper.CameraPath);
+
+        // Recreate empty folders so the app continues to function
+        Directory.CreateDirectory(PathHelper.ScreenshotsPath);
+        Directory.CreateDirectory(PathHelper.AudioPath);
+        Directory.CreateDirectory(PathHelper.CameraPath);
+
+        await _db.MarkAllCapturesDeletedAsync();
+    }
+
+    private static void DeleteFolder(string path)
+    {
+        if (!Directory.Exists(path)) return;
+        foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+        {
+            try { File.Delete(file); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[CleanupService] Failed to delete {file}: {ex.Message}");
             }
         }
     }

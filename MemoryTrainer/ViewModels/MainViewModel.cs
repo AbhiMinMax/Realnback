@@ -39,7 +39,7 @@ public partial class MainViewModel : ObservableObject
 
     public void ShowHistory()
     {
-        CurrentView = new HistoryViewModel(_db, () => ShowConfig());
+        CurrentView = new HistoryViewModel(_db, _cleanupService, () => ShowConfig());
     }
 
     public void ShowSettings()

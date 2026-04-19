@@ -83,3 +83,45 @@ public class BoolToCorrectColorConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotImplementedException();
 }
+
+public class StepStateToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is MemoryTrainer.ViewModels.StepState state)
+        {
+            return state switch
+            {
+                MemoryTrainer.ViewModels.StepState.Completed => System.Windows.Media.Brushes.MediumSeaGreen,
+                MemoryTrainer.ViewModels.StepState.Current => System.Windows.Media.Brushes.CornflowerBlue,
+                _ => System.Windows.Media.Brushes.DimGray
+            };
+        }
+        return System.Windows.Media.Brushes.DimGray;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}
+
+public class StepStateToSymbolConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is MemoryTrainer.ViewModels.StepState state && state == MemoryTrainer.ViewModels.StepState.Completed)
+            return "✓";
+        return parameter?.ToString() ?? "?";
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}
+
+public class StepStateToOpacityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is MemoryTrainer.ViewModels.StepState state && state == MemoryTrainer.ViewModels.StepState.Pending ? 0.4 : 1.0;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}

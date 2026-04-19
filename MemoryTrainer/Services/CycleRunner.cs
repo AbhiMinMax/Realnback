@@ -1,3 +1,4 @@
+using MemoryTrainer.Helpers;
 using MemoryTrainer.Models;
 
 namespace MemoryTrainer.Services;
@@ -8,6 +9,8 @@ public class CycleRunner
     private readonly List<DecoyOffset> _decoyOffsets;
     private readonly DatabaseService _db;
     private readonly ScreenshotService _screenshotService;
+    private readonly AudioCaptureService? _audioCaptureService;
+    private readonly CameraCaptureService? _cameraCaptureService;
     private readonly int _sessionId;
 
     private CancellationTokenSource _cts = new();
@@ -24,12 +27,16 @@ public class CycleRunner
     public SessionCycleConfig Config => _config;
 
     public CycleRunner(SessionCycleConfig config, List<DecoyOffset> decoyOffsets,
-        DatabaseService db, ScreenshotService screenshotService, int sessionId)
+        DatabaseService db, ScreenshotService screenshotService,
+        AudioCaptureService? audioCaptureService, CameraCaptureService? cameraCaptureService,
+        int sessionId)
     {
         _config = config;
         _decoyOffsets = decoyOffsets;
         _db = db;
         _screenshotService = screenshotService;
+        _audioCaptureService = audioCaptureService;
+        _cameraCaptureService = cameraCaptureService;
         _sessionId = sessionId;
     }
 
@@ -190,7 +197,6 @@ public class CycleRunner
 
         if (record.Status == CycleStatus.WaitingForScreenshot)
         {
-            // Schedule decoys concurrently
             var decoyCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var decoyTasks = ScheduleDecoys(record, resuming, decoyCts.Token);
 
@@ -199,16 +205,59 @@ public class CycleRunner
 
             ct.ThrowIfCancellationRequested();
 
-            // Capture main screenshot
-            var path = _screenshotService.Capture(_sessionId, record.Id, isMain: true, offsetMinutes: null);
-            var screenshotRecord = new ScreenshotRecord
+            // Main screenshot
+            var screenshotPath = _screenshotService.Capture(_sessionId, record.Id, isMain: true, offsetMinutes: null);
+            var screenshotCapture = new CaptureRecord
             {
                 CycleRecordId = record.Id,
-                FilePath = path,
+                Type = CaptureType.Screenshot,
+                IsMain = true,
+                FilePath = screenshotPath,
                 TakenAtUtc = DateTime.UtcNow,
-                IsMain = true
+                Availability = CaptureAvailability.Captured
             };
-            screenshotRecord.Id = await _db.CreateScreenshotRecordAsync(screenshotRecord);
+            await _db.CreateCaptureRecordAsync(screenshotCapture);
+
+            // Audio capture — runs 15s concurrently then saves; completes long before prompt fires
+            if (_config.AudioEnabled && _audioCaptureService != null)
+            {
+                var audioPath = Path.Combine(PathHelper.AudioPath, _sessionId.ToString(),
+                    $"{record.Id}_audio_{DateTime.UtcNow:yyyyMMddHHmmss}.wav");
+                _ = Task.Run(async () =>
+                {
+                    var result = await _audioCaptureService.CaptureAsync(audioPath);
+                    var availability = result != null ? CaptureAvailability.Captured : CaptureAvailability.Skipped_NoAudio;
+                    var audioCapture = new CaptureRecord
+                    {
+                        CycleRecordId = record.Id,
+                        Type = CaptureType.Audio,
+                        IsMain = true,
+                        FilePath = result,
+                        TakenAtUtc = DateTime.UtcNow,
+                        Availability = availability
+                    };
+                    await _db.CreateCaptureRecordAsync(audioCapture);
+                });
+            }
+
+            // Camera capture
+            if (_config.CameraEnabled && _cameraCaptureService != null)
+            {
+                var cameraPath = Path.Combine(PathHelper.CameraPath, _sessionId.ToString(),
+                    $"{record.Id}_camera_{DateTime.UtcNow:yyyyMMddHHmmss}.png");
+                var result = _cameraCaptureService.Capture(cameraPath);
+                var availability = result != null ? CaptureAvailability.Captured : CaptureAvailability.Skipped_DeviceUnavailable;
+                var cameraCapture = new CaptureRecord
+                {
+                    CycleRecordId = record.Id,
+                    Type = CaptureType.Camera,
+                    IsMain = true,
+                    FilePath = result,
+                    TakenAtUtc = DateTime.UtcNow,
+                    Availability = availability
+                };
+                await _db.CreateCaptureRecordAsync(cameraCapture);
+            }
 
             record.ScreenshotTakenUtc = DateTime.UtcNow;
             record.PromptDueUtc = record.ScreenshotTakenUtc + TimeSpan.FromTicks(record.ActualDurationTicks);
@@ -218,7 +267,6 @@ public class CycleRunner
 
             _pausedScreenshotRemaining = null;
 
-            // Wait for decoys too (fire and forget, they cancel on pause/stop)
             _ = Task.WhenAll(decoyTasks);
         }
 
@@ -274,19 +322,20 @@ public class CycleRunner
             ct.ThrowIfCancellationRequested();
 
             var path = _screenshotService.Capture(_sessionId, record.Id, isMain: false, offsetMinutes: decoy.OffsetMinutes);
-            var screenshotRecord = new ScreenshotRecord
+            var captureRecord = new CaptureRecord
             {
                 CycleRecordId = record.Id,
+                Type = CaptureType.Screenshot,
+                IsMain = false,
+                DecoyOffsetMinutes = decoy.OffsetMinutes,
                 FilePath = path,
                 TakenAtUtc = DateTime.UtcNow,
-                IsMain = false,
-                OffsetMinutes = decoy.OffsetMinutes
+                Availability = CaptureAvailability.Captured
             };
-            await _db.CreateScreenshotRecordAsync(screenshotRecord);
+            await _db.CreateCaptureRecordAsync(captureRecord);
         }
         catch (OperationCanceledException)
         {
-            // Record remaining time for resume
             var captureTime = record.ScheduledScreenshotUtc + TimeSpan.FromMinutes(decoy.OffsetMinutes);
             var remaining = captureTime - DateTime.UtcNow;
             if (remaining > TimeSpan.Zero)

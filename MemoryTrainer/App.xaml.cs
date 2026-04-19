@@ -23,8 +23,10 @@ public partial class App : Application
         db.InitialiseSchema();
 
         var screenshotService = new ScreenshotService(PathHelper.ScreenshotsPath);
+        var audioCaptureService = new AudioCaptureService();
+        var cameraCaptureService = new CameraCaptureService();
         var cleanupService = new CleanupService(db);
-        var engine = new SessionEngine(db, screenshotService, cleanupService);
+        var engine = new SessionEngine(db, screenshotService, audioCaptureService, cameraCaptureService, cleanupService);
 
         var mainVm = new MainViewModel(engine, db, cleanupService);
         var mainWindow = new MainWindow { DataContext = mainVm };

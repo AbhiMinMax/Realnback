@@ -120,12 +120,32 @@
                                                     </ToolTip>
                                                 </CheckBox.ToolTip>
                                             </CheckBox>
-                                            <CheckBox Content="Recognition" IsChecked="{Binding RecognitionEnabled}" VerticalAlignment="Center">
+                                            <CheckBox Content="Recognition" IsChecked="{Binding RecognitionEnabled}" Margin="0,0,10,0" VerticalAlignment="Center">
                                                 <CheckBox.ToolTip>
                                                     <ToolTip>
                                                         <StackPanel MaxWidth="260">
                                                             <TextBlock Text="Recognition Recall" FontWeight="Bold" Margin="0,0,0,4"/>
                                                             <TextBlock TextWrapping="Wrap" Text="You pick the correct screenshot from a set of options. One is the real capture; the rest are decoys from surrounding times. Evaluated automatically."/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </CheckBox.ToolTip>
+                                            </CheckBox>
+                                            <CheckBox Content="Audio" IsChecked="{Binding AudioEnabled}" Margin="0,0,10,0" VerticalAlignment="Center">
+                                                <CheckBox.ToolTip>
+                                                    <ToolTip>
+                                                        <StackPanel MaxWidth="260">
+                                                            <TextBlock Text="Audio Capture" FontWeight="Bold" Margin="0,0,0,4"/>
+                                                            <TextBlock TextWrapping="Wrap" Text="Records a 30-second audio clip centred around the capture time using system audio (WASAPI loopback). Falls back to microphone if system audio is silent."/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </CheckBox.ToolTip>
+                                            </CheckBox>
+                                            <CheckBox Content="Camera" IsChecked="{Binding CameraEnabled}" VerticalAlignment="Center">
+                                                <CheckBox.ToolTip>
+                                                    <ToolTip>
+                                                        <StackPanel MaxWidth="260">
+                                                            <TextBlock Text="Camera Capture" FontWeight="Bold" Margin="0,0,0,4"/>
+                                                            <TextBlock TextWrapping="Wrap" Text="Takes a single webcam snapshot at the capture time. Requires a connected camera. Skipped silently if no device is found."/>
                                                         </StackPanel>
                                                     </ToolTip>
                                                 </CheckBox.ToolTip>

@@ -23,11 +23,16 @@ public static class PathHelper
         }
     }
 
+    public static string AudioPath => Path.Combine(DataFolder, "audio");
+    public static string CameraPath => Path.Combine(DataFolder, "camera");
+
     public static void EnsureDataDirectories()
     {
         Directory.CreateDirectory(DataFolder);
         LoadSettings();
         Directory.CreateDirectory(ScreenshotsPath);
+        Directory.CreateDirectory(AudioPath);
+        Directory.CreateDirectory(CameraPath);
     }
 
     public static void LoadSettings()

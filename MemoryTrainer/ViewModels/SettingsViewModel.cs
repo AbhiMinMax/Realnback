@@ -44,17 +44,17 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task DeleteAllScreenshotsAsync()
+    private async Task DeleteAllCapturedMediaAsync()
     {
         var result = System.Windows.MessageBox.Show(
-            "This will delete all screenshot files. Score history is not affected.",
-            "Delete All Screenshots",
+            "This will delete all screenshot, audio, and camera files. Score history is not affected.",
+            "Delete All Captured Media",
             System.Windows.MessageBoxButton.YesNo,
             System.Windows.MessageBoxImage.Warning);
         if (result != System.Windows.MessageBoxResult.Yes) return;
 
-        await _cleanupService.DeleteAllScreenshotsAsync(PathHelper.ScreenshotsPath);
-        StatusMessage = "All screenshots deleted.";
+        await _cleanupService.DeleteAllCapturedMediaAsync();
+        StatusMessage = "All captured media deleted.";
     }
 
     [RelayCommand]

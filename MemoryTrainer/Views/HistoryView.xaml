@@ -52,6 +52,16 @@
                 </ComboBox>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
+                <TextBlock Text="Capture:" Style="{StaticResource Label}" Margin="0,0,6,0"
+                           ToolTip="Filter by capture type enabled for that cycle."/>
+                <ComboBox SelectedValue="{Binding CaptureTypeFilter}" SelectedValuePath="Content" Width="110">
+                    <ComboBoxItem>All</ComboBoxItem>
+                    <ComboBoxItem>Screenshot</ComboBoxItem>
+                    <ComboBoxItem>Audio</ComboBoxItem>
+                    <ComboBoxItem>Camera</ComboBoxItem>
+                </ComboBox>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,12,4">
                 <TextBlock Text="Sort:" Style="{StaticResource Label}" Margin="0,0,6,0"
                            ToolTip="Sort the detail list by date, duration slot, or recall result."/>
                 <ComboBox SelectedValue="{Binding SortBy}" SelectedValuePath="Content" Width="80">
@@ -74,14 +84,15 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="120"/>
                 </Grid.RowDefinitions>
+                <!-- Free recall + Recognition stats -->
                 <Grid Grid.Row="0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <!-- Free recall stats -->
                     <StackPanel Grid.Column="0">
                         <TextBlock Text="Free Recall" FontWeight="SemiBold" Margin="0,0,0,4"
                                    ToolTip="Written recall you self-evaluated as Correct, Partial, or Wrong."/>
@@ -98,7 +109,6 @@
                                        ToolTip="Current consecutive Correct count (most recent first). Resets on any non-Correct result."/>
                         </WrapPanel>
                     </StackPanel>
-                    <!-- Recognition stats -->
                     <StackPanel Grid.Column="1">
                         <TextBlock Text="Recognition" FontWeight="SemiBold" Margin="0,0,0,4"
                                    ToolTip="Screenshot selection task — you picked the correct screenshot from a set of options."/>
@@ -114,8 +124,35 @@
                         </WrapPanel>
                     </StackPanel>
                 </Grid>
+                <!-- Audio + Camera stats -->
+                <Grid Grid.Row="1" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Audio Recall" FontWeight="SemiBold" Margin="0,0,0,4"
+                                   ToolTip="Written recall of audio you heard, self-evaluated after listening back."/>
+                        <WrapPanel>
+                            <TextBlock Text="{Binding TotalAudio, StringFormat='Total: {0}'}" Margin="0,0,16,0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="{Binding CorrectAudioPct, StringFormat='Correct: {0}'}" Foreground="{StaticResource SuccessBrush}" Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding PartialAudioPct, StringFormat='Partial: {0}'}" Foreground="{StaticResource WarningBrush}" Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding WrongAudioPct, StringFormat='Wrong: {0}'}" Foreground="{StaticResource ErrorBrush}"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Camera Recall" FontWeight="SemiBold" Margin="0,0,0,4"
+                                   ToolTip="Written recall of your appearance/surroundings, self-evaluated after viewing the webcam photo."/>
+                        <WrapPanel>
+                            <TextBlock Text="{Binding TotalCamera, StringFormat='Total: {0}'}" Margin="0,0,16,0" Style="{StaticResource Label}"/>
+                            <TextBlock Text="{Binding CorrectCameraPct, StringFormat='Correct: {0}'}" Foreground="{StaticResource SuccessBrush}" Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding PartialCameraPct, StringFormat='Partial: {0}'}" Foreground="{StaticResource WarningBrush}" Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding WrongCameraPct, StringFormat='Wrong: {0}'}" Foreground="{StaticResource ErrorBrush}"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Grid>
                 <!-- Chart -->
-                <lvc:CartesianChart Grid.Row="1"
+                <lvc:CartesianChart Grid.Row="2"
                                     Series="{Binding ChartSeries}"
                                     XAxes="{Binding ChartXAxes}"
                                     Margin="0,8,0,0"/>
@@ -151,6 +188,8 @@
                                             <ColumnDefinition Width="60"/>
                                             <ColumnDefinition Width="80"/>
                                             <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="80"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
@@ -162,9 +201,13 @@
                                                    Foreground="{Binding FreeRecallResult, Converter={StaticResource EvalResultToColor}}"/>
                                         <TextBlock Grid.Column="5" Text="{Binding RecognitionResult}"
                                                    Foreground="{Binding RecognitionResult, Converter={StaticResource EvalResultToColor}}"/>
-                                        <TextBlock Grid.Column="6" Text="{Binding FreeRecallTextShort}"
+                                        <TextBlock Grid.Column="6" Text="{Binding AudioResult}"
+                                                   Foreground="{Binding AudioResult, Converter={StaticResource EvalResultToColor}}"/>
+                                        <TextBlock Grid.Column="7" Text="{Binding CameraResult}"
+                                                   Foreground="{Binding CameraResult, Converter={StaticResource EvalResultToColor}}"/>
+                                        <TextBlock Grid.Column="8" Text="{Binding FreeRecallTextShort}"
                                                    Style="{StaticResource Label}" TextTrimming="CharacterEllipsis"/>
-                                        <Button Grid.Column="7" Content="▼" Style="{StaticResource SecondaryButton}"
+                                        <Button Grid.Column="9" Content="▼" Style="{StaticResource SecondaryButton}"
                                                 Padding="4,2" FontSize="10"
                                                 Click="OnExpandRow"/>
                                     </Grid>

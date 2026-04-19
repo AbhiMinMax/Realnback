@@ -7,6 +7,8 @@ public class SessionEngine
 {
     private readonly DatabaseService _db;
     private readonly ScreenshotService _screenshotService;
+    private readonly AudioCaptureService _audioCaptureService;
+    private readonly CameraCaptureService _cameraCaptureService;
     private readonly CleanupService _cleanupService;
 
     private SessionModel? _activeSession;
@@ -24,10 +26,14 @@ public class SessionEngine
     public bool IsPaused => _activeSession?.IsPaused ?? false;
     public int QueuedPromptCount => _promptQueue.Count;
 
-    public SessionEngine(DatabaseService db, ScreenshotService screenshotService, CleanupService cleanupService)
+    public SessionEngine(DatabaseService db, ScreenshotService screenshotService,
+        AudioCaptureService audioCaptureService, CameraCaptureService cameraCaptureService,
+        CleanupService cleanupService)
     {
         _db = db;
         _screenshotService = screenshotService;
+        _audioCaptureService = audioCaptureService;
+        _cameraCaptureService = cameraCaptureService;
         _cleanupService = cleanupService;
     }
 
@@ -40,6 +46,9 @@ public class SessionEngine
         };
         session.Id = await _db.CreateSessionAsync(session);
         _activeSession = session;
+
+        bool anyAudio = cycles.Any(c => c.config.AudioEnabled);
+        if (anyAudio) _audioCaptureService.StartBuffer();
 
         foreach (var (config, decoys) in cycles)
         {
@@ -62,6 +71,7 @@ public class SessionEngine
     public async Task PauseAsync()
     {
         if (_activeSession == null) return;
+        _audioCaptureService.StopBuffer();
         foreach (var runner in _runners)
             runner.Pause();
         _activeSession.IsPaused = true;
@@ -72,6 +82,8 @@ public class SessionEngine
     public async Task ResumeAsync()
     {
         if (_activeSession == null) return;
+        bool anyAudio = _runners.Any(r => r.Config.AudioEnabled);
+        if (anyAudio) _audioCaptureService.StartBuffer();
         foreach (var runner in _runners)
             runner.Resume();
         _activeSession.IsPaused = false;
@@ -83,10 +95,11 @@ public class SessionEngine
     {
         if (_activeSession == null) return;
 
+        _audioCaptureService.StopBuffer();
+
         foreach (var runner in _runners)
         {
             runner.Stop();
-            // Mark in-progress cycle as incomplete
             var record = runner.CurrentRecord;
             if (record != null && record.Status != CycleStatus.Completed
                 && record.Status != CycleStatus.Missed && record.Status != CycleStatus.Incomplete)
@@ -107,6 +120,9 @@ public class SessionEngine
     {
         _activeSession = session;
         var configs = await _db.GetConfigsBySessionAsync(session.Id);
+
+        bool anyAudio = configs.Any(c => c.AudioEnabled);
+        if (anyAudio) _audioCaptureService.StartBuffer();
 
         foreach (var config in configs)
         {
@@ -142,8 +158,6 @@ public class SessionEngine
 
     public void EnqueuePrompt(CycleRecord record)
     {
-        // Sort by duration descending — insert in order
-        // Since ConcurrentQueue doesn't support ordered insert, we rebuild
         var list = new List<CycleRecord>(_promptQueue) { record };
         list.Sort((a, b) => b.ActualDurationTicks.CompareTo(a.ActualDurationTicks));
 
@@ -175,7 +189,8 @@ public class SessionEngine
 
     private CycleRunner CreateRunner(SessionCycleConfig config, List<DecoyOffset> decoys, int sessionId)
     {
-        var runner = new CycleRunner(config, decoys, _db, _screenshotService, sessionId);
+        var runner = new CycleRunner(config, decoys, _db, _screenshotService,
+            _audioCaptureService, _cameraCaptureService, sessionId);
         runner.PromptReady += async (record) =>
         {
             await Task.Run(() => EnqueuePrompt(record));

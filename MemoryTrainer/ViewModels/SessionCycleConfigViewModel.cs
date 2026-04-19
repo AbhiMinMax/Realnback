@@ -20,8 +20,10 @@ public partial class SessionCycleConfigViewModel : ObservableObject
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsValid))] private int _durationMinutes = 15;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsValid))] private int _waitingWindowMinutes = 5;
     [ObservableProperty] private int _driftMinutes;
-    [ObservableProperty] private bool _freeRecallEnabled = true;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsValid))] private bool _freeRecallEnabled = true;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsValid))] private bool _recognitionEnabled = true;
+    [ObservableProperty] private bool _audioEnabled;
+    [ObservableProperty] private bool _cameraEnabled;
     [ObservableProperty] private bool _decoyOffsetExpanded;
 
     public ObservableCollection<DecoyOffsetViewModel> DecoyOffsets { get; } = new();
@@ -30,7 +32,7 @@ public partial class SessionCycleConfigViewModel : ObservableObject
     {
         get
         {
-            if (!FreeRecallEnabled && !RecognitionEnabled) return false;
+            if (!FreeRecallEnabled && !RecognitionEnabled && !AudioEnabled && !CameraEnabled) return false;
             var duration = TotalDuration;
             if (duration <= TimeSpan.Zero) return false;
             var window = TimeSpan.FromMinutes(WaitingWindowMinutes);
@@ -44,8 +46,8 @@ public partial class SessionCycleConfigViewModel : ObservableObject
     {
         get
         {
-            if (!FreeRecallEnabled && !RecognitionEnabled)
-                return "At least one recall mode must be enabled.";
+            if (!FreeRecallEnabled && !RecognitionEnabled && !AudioEnabled && !CameraEnabled)
+                return "At least one recall type must be enabled.";
             var duration = TotalDuration;
             if (duration <= TimeSpan.Zero)
                 return "Duration must be at least 1 minute.";
@@ -82,6 +84,8 @@ public partial class SessionCycleConfigViewModel : ObservableObject
             DriftMinutes = DriftMinutes,
             FreeRecallEnabled = FreeRecallEnabled,
             RecognitionEnabled = RecognitionEnabled,
+            AudioEnabled = AudioEnabled,
+            CameraEnabled = CameraEnabled,
         };
 
         var decoys = DecoyOffsets

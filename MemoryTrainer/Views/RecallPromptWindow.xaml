@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:MemoryTrainer.ViewModels"
-        Title="Memory Recall" Width="640" MinHeight="300"
+        Title="Memory Recall" Width="640" MinHeight="360"
         SizeToContent="Height"
         WindowStyle="ToolWindow"
         Topmost="True"
@@ -10,104 +10,202 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
         <StackPanel>
-            <!-- Header -->
-            <TextBlock Text="{Binding HeaderText}" FontSize="16" FontWeight="Bold"
-                       Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,16"
-                       TextWrapping="Wrap"/>
 
-            <!-- FREE RECALL SECTION -->
-            <StackPanel Visibility="{Binding FreeRecallEnabled, Converter={StaticResource BoolToVisibility}}">
-                <TextBlock Text="Describe what you were doing AND what specific content was visible on screen."
+            <!-- Step indicator -->
+            <ItemsControl ItemsSource="{Binding StepIndicators}" Margin="0,0,0,16">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:StepIndicatorItem}">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
+                            <Border Width="28" Height="28" CornerRadius="14"
+                                    Background="{Binding State, Converter={StaticResource StepStateToBrush}}"
+                                    BorderBrush="{Binding State, Converter={StaticResource StepStateToBrush}}"
+                                    BorderThickness="1">
+                                <TextBlock x:Name="StepLabel" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           FontSize="12" FontWeight="SemiBold" Foreground="White">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="{Binding Number}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding State}" Value="Completed">
+                                                    <Setter Property="Text" Value="✓"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Border>
+                            <TextBlock Text="{Binding Label}" VerticalAlignment="Center" Margin="6,0,0,0"
+                                       Opacity="{Binding State, Converter={StaticResource StepStateToOpacity}}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- ── SCREENSHOT TAB ── -->
+            <StackPanel Visibility="{Binding OnScreenshotTab, Converter={StaticResource BoolToVisibility}}">
+
+                <TextBlock Text="{Binding HeaderText}" FontSize="16" FontWeight="Bold"
+                           Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,16"
+                           TextWrapping="Wrap"/>
+
+                <!-- Free recall -->
+                <StackPanel Visibility="{Binding FreeRecallEnabled, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="Describe what you were doing AND what specific content was visible on screen."
+                               Style="{StaticResource Label}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                    <TextBox Text="{Binding RecallText, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True" TextWrapping="Wrap"
+                             MinHeight="120" MaxHeight="200" VerticalScrollBarVisibility="Auto"
+                             IsReadOnly="{Binding IsVerified}" Margin="0,0,0,8"/>
+                    <Button Content="Verify" Command="{Binding VerifyCommand}"
+                            IsEnabled="{Binding CanVerify}" HorizontalAlignment="Left"
+                            Visibility="{Binding IsVerified, Converter={StaticResource InverseBoolToVisibility}}"
+                            Margin="0,0,0,12"/>
+                    <StackPanel Visibility="{Binding IsVerified, Converter={StaticResource BoolToVisibility}}">
+                        <Button Content="Open Screenshot" Style="{StaticResource LinkButton}"
+                                Command="{Binding OpenMainCaptureCommand}"
+                                IsEnabled="{Binding MainCaptureAvailable}"
+                                HorizontalAlignment="Left" Margin="0,0,0,8"/>
+                        <TextBlock Text="File unavailable" Foreground="{StaticResource ErrorBrush}" FontSize="11"
+                                   Visibility="{Binding MainCaptureAvailable, Converter={StaticResource InverseBoolToVisibility}}"
+                                   Margin="0,0,0,8"/>
+                        <StackPanel Visibility="{Binding FreeRecallCompleted, Converter={StaticResource InverseBoolToVisibility}}">
+                            <TextBlock Text="How accurate was your recall?" Style="{StaticResource Label}" Margin="0,0,0,6"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Correct" Margin="0,0,8,0"
+                                        Command="{Binding EvaluateFreeRecallCommand}" CommandParameter="Correct">
+                                    <Button.ToolTip><ToolTip><TextBlock TextWrapping="Wrap" Text="Right screen/app AND specific content recalled accurately"/></ToolTip></Button.ToolTip>
+                                </Button>
+                                <Button Content="Partial" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                                        Command="{Binding EvaluateFreeRecallCommand}" CommandParameter="Partial">
+                                    <Button.ToolTip><ToolTip><TextBlock TextWrapping="Wrap" Text="Context right but content missed, or vice versa"/></ToolTip></Button.ToolTip>
+                                </Button>
+                                <Button Content="Wrong" Style="{StaticResource DangerButton}"
+                                        Command="{Binding EvaluateFreeRecallCommand}" CommandParameter="Wrong">
+                                    <Button.ToolTip><ToolTip><TextBlock TextWrapping="Wrap" Text="Neither screen nor content recalled correctly"/></ToolTip></Button.ToolTip>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                        <TextBlock Visibility="{Binding FreeRecallCompleted, Converter={StaticResource BoolToVisibility}}" Margin="0,4,0,0">
+                            <Run Text="Free recall: "/>
+                            <Run Text="{Binding FreeRecallResult}" Foreground="{StaticResource SuccessBrush}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Separator -->
+                <Separator Margin="0,12,0,12"
+                           Visibility="{Binding RecognitionAvailable, Converter={StaticResource BoolToVisibility}}"/>
+
+                <!-- Recognition -->
+                <StackPanel Visibility="{Binding RecognitionAvailable, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="{Binding HeaderText, StringFormat='Which of these was your screen {0}?'}"
+                               FontWeight="SemiBold" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                    <ItemsControl ItemsSource="{Binding RecognitionOptions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:RecognitionOptionViewModel}">
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
+                                    <Button Content="{Binding Label}" Style="{StaticResource LinkButton}"
+                                            Command="{Binding DataContext.OpenOptionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}"
+                                            IsEnabled="{Binding IsFileAvailable}" Margin="0,0,12,0"/>
+                                    <Button Content="Select"
+                                            Command="{Binding DataContext.SelectOptionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}" Padding="10,4"
+                                            Visibility="{Binding DataContext.RecognitionCompleted, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource InverseBoolToVisibility}}"/>
+                                    <TextBlock Margin="8,0,0,0" VerticalAlignment="Center"
+                                               Text="{Binding IsCorrect, Converter={StaticResource BoolToCorrectWrong}}"
+                                               Foreground="{Binding IsCorrect, Converter={StaticResource BoolToCorrectColor}}"
+                                               Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- ── AUDIO TAB ── -->
+            <StackPanel Visibility="{Binding OnAudioTab, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="{Binding AudioHeaderText}" FontSize="16" FontWeight="Bold"
+                           Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                <TextBlock Text="Describe what you remember hearing — music, speech, ambient sound, silence."
                            Style="{StaticResource Label}" TextWrapping="Wrap" Margin="0,0,0,6"/>
-
-                <TextBox Text="{Binding RecallText, UpdateSourceTrigger=PropertyChanged}"
+                <TextBox Text="{Binding AudioRecallText, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True" TextWrapping="Wrap"
-                         MinHeight="120" MaxHeight="200" VerticalScrollBarVisibility="Auto"
-                         IsReadOnly="{Binding IsVerified}"
-                         Margin="0,0,0,8"/>
-
-                <!-- Verify button — shown before verify, hidden after -->
-                <Button Content="Verify" Command="{Binding VerifyCommand}"
-                        IsEnabled="{Binding CanVerify}"
-                        HorizontalAlignment="Left"
-                        Visibility="{Binding IsVerified, Converter={StaticResource InverseBoolToVisibility}}"
+                         MinHeight="100" MaxHeight="180" VerticalScrollBarVisibility="Auto"
+                         IsReadOnly="{Binding AudioIsVerified}" Margin="0,0,0,8"/>
+                <Button Content="Verify" Command="{Binding VerifyAudioCommand}"
+                        IsEnabled="{Binding CanVerifyAudio}" HorizontalAlignment="Left"
+                        Visibility="{Binding AudioIsVerified, Converter={StaticResource InverseBoolToVisibility}}"
                         Margin="0,0,0,12"/>
-
-                <!-- Post-verify evaluation -->
-                <StackPanel Visibility="{Binding IsVerified, Converter={StaticResource BoolToVisibility}}">
-                    <Button Content="Open Screenshot" Style="{StaticResource LinkButton}"
-                            Command="{Binding OpenMainScreenshotCommand}"
-                            IsEnabled="{Binding MainScreenshotAvailable}"
+                <StackPanel Visibility="{Binding AudioIsVerified, Converter={StaticResource BoolToVisibility}}">
+                    <Button Content="Open Audio" Style="{StaticResource LinkButton}"
+                            Command="{Binding OpenAudioCaptureCommand}"
                             HorizontalAlignment="Left" Margin="0,0,0,8"/>
-
-                    <TextBlock Text="File unavailable" Foreground="{StaticResource ErrorBrush}" FontSize="11"
-                               Visibility="{Binding MainScreenshotAvailable, Converter={StaticResource InverseBoolToVisibility}}"
-                               Margin="0,0,0,8"/>
-
-                    <StackPanel Visibility="{Binding FreeRecallCompleted, Converter={StaticResource InverseBoolToVisibility}}">
+                    <StackPanel Visibility="{Binding AudioRecallCompleted, Converter={StaticResource InverseBoolToVisibility}}">
                         <TextBlock Text="How accurate was your recall?" Style="{StaticResource Label}" Margin="0,0,0,6"/>
                         <StackPanel Orientation="Horizontal">
                             <Button Content="Correct" Margin="0,0,8,0"
-                                    Command="{Binding EvaluateFreeRecallCommand}" CommandParameter="Correct">
-                                <Button.ToolTip>Right screen/app AND specific content recalled accurately</Button.ToolTip>
-                            </Button>
+                                    Command="{Binding EvaluateAudioCommand}" CommandParameter="Correct"/>
                             <Button Content="Partial" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
-                                    Command="{Binding EvaluateFreeRecallCommand}" CommandParameter="Partial">
-                                <Button.ToolTip>Context right but content missed, or vice versa</Button.ToolTip>
-                            </Button>
+                                    Command="{Binding EvaluateAudioCommand}" CommandParameter="Partial"/>
                             <Button Content="Wrong" Style="{StaticResource DangerButton}"
-                                    Command="{Binding EvaluateFreeRecallCommand}" CommandParameter="Wrong">
-                                <Button.ToolTip>Neither screen nor content recalled correctly</Button.ToolTip>
-                            </Button>
+                                    Command="{Binding EvaluateAudioCommand}" CommandParameter="Wrong"/>
                         </StackPanel>
                     </StackPanel>
-
-                    <TextBlock Visibility="{Binding FreeRecallCompleted, Converter={StaticResource BoolToVisibility}}"
-                               Margin="0,4,0,0">
-                        <Run Text="Free recall: "/>
-                        <Run Text="{Binding FreeRecallResult}" Foreground="{StaticResource SuccessBrush}"/>
+                    <TextBlock Visibility="{Binding AudioRecallCompleted, Converter={StaticResource BoolToVisibility}}" Margin="0,4,0,0">
+                        <Run Text="Audio recall: "/>
+                        <Run Text="{Binding AudioEvalResult}" Foreground="{StaticResource SuccessBrush}"/>
                     </TextBlock>
                 </StackPanel>
             </StackPanel>
 
-            <!-- Separator between sections -->
-            <Separator Margin="0,12,0,12"
-                       Visibility="{Binding RecognitionAvailable, Converter={StaticResource BoolToVisibility}}"/>
-
-            <!-- RECOGNITION SECTION -->
-            <StackPanel Visibility="{Binding RecognitionAvailable, Converter={StaticResource BoolToVisibility}}">
-                <TextBlock Text="{Binding HeaderText, StringFormat='Which of these was your screen {0}?'}"
-                           FontWeight="SemiBold" Margin="0,0,0,8" TextWrapping="Wrap"/>
-
-                <ItemsControl ItemsSource="{Binding RecognitionOptions}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="{x:Type vm:RecognitionOptionViewModel}">
-                            <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
-                                <Button Content="{Binding Label}" Style="{StaticResource LinkButton}"
-                                        Command="{Binding DataContext.OpenOptionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                        CommandParameter="{Binding}"
-                                        IsEnabled="{Binding IsFileAvailable}"
-                                        Margin="0,0,12,0"/>
-                                <Button Content="Select"
-                                        Command="{Binding DataContext.SelectOptionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                        CommandParameter="{Binding}"
-                                        Padding="10,4"
-                                        Visibility="{Binding DataContext.RecognitionCompleted, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource InverseBoolToVisibility}}"/>
-                                <TextBlock Margin="8,0,0,0" VerticalAlignment="Center"
-                                           Text="{Binding IsCorrect, Converter={StaticResource BoolToCorrectWrong}}"
-                                           Foreground="{Binding IsCorrect, Converter={StaticResource BoolToCorrectColor}}"
-                                           Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+            <!-- ── CAMERA TAB ── -->
+            <StackPanel Visibility="{Binding OnCameraTab, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="{Binding CameraHeaderText}" FontSize="16" FontWeight="Bold"
+                           Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                <TextBlock Text="Describe your posture, expression, or surroundings as you remember them."
+                           Style="{StaticResource Label}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                <TextBox Text="{Binding CameraRecallText, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" TextWrapping="Wrap"
+                         MinHeight="100" MaxHeight="180" VerticalScrollBarVisibility="Auto"
+                         IsReadOnly="{Binding CameraIsVerified}" Margin="0,0,0,8"/>
+                <Button Content="Verify" Command="{Binding VerifyCameraCommand}"
+                        IsEnabled="{Binding CanVerifyCamera}" HorizontalAlignment="Left"
+                        Visibility="{Binding CameraIsVerified, Converter={StaticResource InverseBoolToVisibility}}"
+                        Margin="0,0,0,12"/>
+                <StackPanel Visibility="{Binding CameraIsVerified, Converter={StaticResource BoolToVisibility}}">
+                    <Button Content="Open Photo" Style="{StaticResource LinkButton}"
+                            Command="{Binding OpenCameraCaptureCommand}"
+                            HorizontalAlignment="Left" Margin="0,0,0,8"/>
+                    <StackPanel Visibility="{Binding CameraRecallCompleted, Converter={StaticResource InverseBoolToVisibility}}">
+                        <TextBlock Text="How accurate was your recall?" Style="{StaticResource Label}" Margin="0,0,0,6"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Correct" Margin="0,0,8,0"
+                                    Command="{Binding EvaluateCameraCommand}" CommandParameter="Correct"/>
+                            <Button Content="Partial" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                                    Command="{Binding EvaluateCameraCommand}" CommandParameter="Partial"/>
+                            <Button Content="Wrong" Style="{StaticResource DangerButton}"
+                                    Command="{Binding EvaluateCameraCommand}" CommandParameter="Wrong"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <TextBlock Visibility="{Binding CameraRecallCompleted, Converter={StaticResource BoolToVisibility}}" Margin="0,4,0,0">
+                        <Run Text="Camera recall: "/>
+                        <Run Text="{Binding CameraEvalResult}" Foreground="{StaticResource SuccessBrush}"/>
+                    </TextBlock>
+                </StackPanel>
             </StackPanel>
 
-            <!-- Done button -->
-            <Button Content="Done" Command="{Binding DoneCommand}"
-                    IsEnabled="{Binding CanDismiss}"
-                    HorizontalAlignment="Right" Margin="0,16,0,0"
-                    Width="80"/>
+            <!-- Next / Done -->
+            <Button Content="{Binding NextButtonText}"
+                    Command="{Binding NextCommand}"
+                    IsEnabled="{Binding CanGoNext}"
+                    HorizontalAlignment="Right" Margin="0,16,0,0" Width="90"/>
+
         </StackPanel>
     </ScrollViewer>
 </Window>

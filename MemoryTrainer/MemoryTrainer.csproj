@@ -18,6 +18,8 @@
     <PackageReference Include="Dapper" Version="2.*" />
     <PackageReference Include="System.Drawing.Common" Version="9.*" />
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.*" />
+    <PackageReference Include="NAudio" Version="2.*" />
+    <PackageReference Include="AForge.Video.DirectShow" Version="2.2.5" />
   </ItemGroup>
 
   <ItemGroup>

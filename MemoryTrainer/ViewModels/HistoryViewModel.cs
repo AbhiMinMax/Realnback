@@ -221,45 +221,36 @@ public partial class HistoryViewModel : ObservableObject
         else if (span.TotalDays <= 31) { bucketFormat = "MM/dd"; bucket = d => d.Date.AddDays(-(int)d.DayOfWeek); }
         else { bucketFormat = "MMM"; bucket = d => new DateTime(d.Year, d.Month, 1); }
 
-        var labels = rows
-            .GroupBy(r => bucket(r.ScreenshotTakenUtc.ToLocalTime()))
-            .OrderBy(g => g.Key)
-            .Select(g => g.Key.ToString(bucketFormat))
-            .ToArray();
+        // Build the canonical ordered list of bucket keys from ALL rows.
+        // Every series must be aligned to this same list — missing buckets get null
+        // so LiveCharts renders a gap rather than shifting remaining points left.
+        var allKeys = rows
+            .Select(r => bucket(r.ScreenshotTakenUtc.ToLocalTime()))
+            .Distinct()
+            .OrderBy(k => k)
+            .ToList();
 
-        double[] SeriesByBucket<T>(IEnumerable<T> source, Func<T, DateTime> time, Func<T, bool> correct)
+        var labels = allKeys.Select(k => k.ToString(bucketFormat)).ToArray();
+
+        double?[] AlignedSeries<T>(IEnumerable<T> source, Func<T, DateTime> time, Func<T, bool> correct)
         {
-            return source.GroupBy(r => bucket(time(r).ToLocalTime()))
-                .OrderBy(g => g.Key)
-                .Select(g => (double)g.Count(r => correct(r)) / g.Count() * 100)
-                .ToArray();
+            var lookup = source
+                .GroupBy(r => bucket(time(r).ToLocalTime()))
+                .ToDictionary(g => g.Key,
+                              g => (double)g.Count(r => correct(r)) / g.Count() * 100);
+            return allKeys.Select(k => lookup.TryGetValue(k, out var v) ? (double?)v : null).ToArray();
         }
 
-        var freeData = SeriesByBucket(
-            rows.Where(r => r.FreeRecallResult.HasValue),
-            r => r.ScreenshotTakenUtc,
-            r => r.FreeRecallResult == EvaluationResult.Correct);
-
-        var recogData = SeriesByBucket(
-            rows.Where(r => r.RecognitionCorrect.HasValue),
-            r => r.ScreenshotTakenUtc,
-            r => r.RecognitionCorrect == true);
-
-        var audioData = SeriesByBucket(
-            rows.Where(r => r.AudioRecallResult.HasValue),
-            r => r.ScreenshotTakenUtc,
-            r => r.AudioRecallResult == EvaluationResult.Correct);
-
-        var cameraData = SeriesByBucket(
-            rows.Where(r => r.CameraRecallResult.HasValue),
-            r => r.ScreenshotTakenUtc,
-            r => r.CameraRecallResult == EvaluationResult.Correct);
+        var freeData   = AlignedSeries(rows.Where(r => r.FreeRecallResult.HasValue),   r => r.ScreenshotTakenUtc, r => r.FreeRecallResult == EvaluationResult.Correct);
+        var recogData  = AlignedSeries(rows.Where(r => r.RecognitionCorrect.HasValue),  r => r.ScreenshotTakenUtc, r => r.RecognitionCorrect == true);
+        var audioData  = AlignedSeries(rows.Where(r => r.AudioRecallResult.HasValue),   r => r.ScreenshotTakenUtc, r => r.AudioRecallResult == EvaluationResult.Correct);
+        var cameraData = AlignedSeries(rows.Where(r => r.CameraRecallResult.HasValue),  r => r.ScreenshotTakenUtc, r => r.CameraRecallResult == EvaluationResult.Correct);
 
         var series = new List<ISeries>();
-        if (freeData.Length > 0) series.Add(new LineSeries<double> { Values = freeData, Name = "Free Recall %" });
-        if (recogData.Length > 0) series.Add(new LineSeries<double> { Values = recogData, Name = "Recognition %" });
-        if (audioData.Length > 0) series.Add(new LineSeries<double> { Values = audioData, Name = "Audio %" });
-        if (cameraData.Length > 0) series.Add(new LineSeries<double> { Values = cameraData, Name = "Camera %" });
+        if (freeData.Any(v => v.HasValue))   series.Add(new LineSeries<double?> { Values = freeData,   Name = "Free Recall %" });
+        if (recogData.Any(v => v.HasValue))  series.Add(new LineSeries<double?> { Values = recogData,  Name = "Recognition %" });
+        if (audioData.Any(v => v.HasValue))  series.Add(new LineSeries<double?> { Values = audioData,  Name = "Audio %" });
+        if (cameraData.Any(v => v.HasValue)) series.Add(new LineSeries<double?> { Values = cameraData, Name = "Camera %" });
 
         ChartSeries = series.ToArray();
         ChartXAxes = new Axis[] { new Axis { Labels = labels } };

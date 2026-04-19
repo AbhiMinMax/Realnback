@@ -46,8 +46,8 @@ public partial class CycleStatusViewModel : ObservableObject, IDisposable
             CycleNumber = record.CycleNumber;
             StatusText = record.Status switch
             {
-                CycleStatus.WaitingForScreenshot => "Waiting for screenshot",
-                CycleStatus.ScreenshotTaken => "Screenshot taken — waiting for prompt",
+                CycleStatus.WaitingForScreenshot => "Screenshot scheduled",
+                CycleStatus.ScreenshotTaken => "Screenshot taken",
                 CycleStatus.PromptQueued => "Prompt queued",
                 CycleStatus.PromptShown => "Prompt shown",
                 CycleStatus.Completed => "Completed",
@@ -64,7 +64,7 @@ public partial class CycleStatusViewModel : ObservableObject, IDisposable
         var screenshotIn = _runner.GetScreenshotCountdown();
         if (screenshotIn.HasValue && screenshotIn.Value > TimeSpan.Zero)
         {
-            CountdownText = $"{TimeFormatter.FormatCountdown(screenshotIn.Value)} remaining";
+            CountdownText = $"{TimeFormatter.FormatCountdown(screenshotIn.Value)} remaining in window";
             return;
         }
 

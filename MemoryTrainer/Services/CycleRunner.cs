@@ -90,8 +90,6 @@ public class CycleRunner
                 else
                 {
                     _pausedScreenshotRemaining = record.ScheduledScreenshotUtc - now;
-                    if (record.PromptDueUtc.HasValue)
-                        _pausedPromptRemaining = record.PromptDueUtc.Value - now;
                     Resume();
                 }
                 break;
@@ -169,7 +167,6 @@ public class CycleRunner
             var waitWindow = TimeSpan.FromTicks(_config.WaitingWindowTicks);
             double randomSeconds = rng.NextDouble() * waitWindow.TotalSeconds;
             var screenshotTime = now + TimeSpan.FromSeconds(randomSeconds);
-            var promptDue = now + TimeSpan.FromTicks(actualTicks);
 
             record = new CycleRecord
             {
@@ -178,12 +175,12 @@ public class CycleRunner
                 ActualDurationTicks = actualTicks,
                 CycleStartUtc = now,
                 ScheduledScreenshotUtc = screenshotTime,
-                PromptDueUtc = promptDue,
+                PromptDueUtc = null,
                 Status = CycleStatus.WaitingForScreenshot
             };
             record.Id = await _db.CreateCycleRecordAsync(record);
             _currentRecord = record;
-            StatusChanged?.Invoke(this, "Waiting for screenshot");
+            StatusChanged?.Invoke(this, "Screenshot scheduled");
         }
 
         // Wait until screenshot time
@@ -214,6 +211,7 @@ public class CycleRunner
             screenshotRecord.Id = await _db.CreateScreenshotRecordAsync(screenshotRecord);
 
             record.ScreenshotTakenUtc = DateTime.UtcNow;
+            record.PromptDueUtc = record.ScreenshotTakenUtc + TimeSpan.FromTicks(record.ActualDurationTicks);
             record.Status = CycleStatus.ScreenshotTaken;
             await _db.UpdateCycleRecordAsync(record);
             StatusChanged?.Invoke(this, "Screenshot taken, waiting for prompt");

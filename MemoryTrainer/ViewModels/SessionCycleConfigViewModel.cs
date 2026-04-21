@@ -7,10 +7,21 @@ namespace MemoryTrainer.ViewModels;
 
 public partial class DecoyOffsetViewModel : ObservableObject
 {
-    [ObservableProperty] private int _offsetMinutes;
-    [ObservableProperty] private string _sign = "+";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ActualOffsetMinutes))]
+    private int _offsetHours;
 
-    public int ActualOffsetMinutes => Sign == "-" ? -Math.Abs(OffsetMinutes) : Math.Abs(OffsetMinutes);
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ActualOffsetMinutes))]
+    private int _offsetMinutes;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ActualOffsetMinutes))]
+    private string _sign = "+";
+
+    public int ActualOffsetMinutes => Sign == "-"
+        ? -(OffsetHours * 60 + Math.Abs(OffsetMinutes))
+        : OffsetHours * 60 + Math.Abs(OffsetMinutes);
 }
 
 public partial class SessionCycleConfigViewModel : ObservableObject
@@ -66,7 +77,28 @@ public partial class SessionCycleConfigViewModel : ObservableObject
     [RelayCommand]
     private void AddDecoyOffset()
     {
-        DecoyOffsets.Add(new DecoyOffsetViewModel { OffsetMinutes = 5, Sign = "-" });
+        DecoyOffsets.Add(CreateDefaultDecoy("-"));
+    }
+
+    partial void OnDecoyOffsetExpandedChanged(bool value)
+    {
+        if (value && DecoyOffsets.Count == 0 && RecognitionEnabled)
+        {
+            DecoyOffsets.Add(CreateDefaultDecoy("-"));
+            DecoyOffsets.Add(CreateDefaultDecoy("+"));
+        }
+    }
+
+    private DecoyOffsetViewModel CreateDefaultDecoy(string sign)
+    {
+        var totalMinutes = (int)TotalDuration.TotalMinutes;
+        var offsetMinutes = Math.Max(5, totalMinutes / 8);
+        return new DecoyOffsetViewModel
+        {
+            OffsetHours = offsetMinutes / 60,
+            OffsetMinutes = offsetMinutes % 60,
+            Sign = sign
+        };
     }
 
     [RelayCommand]

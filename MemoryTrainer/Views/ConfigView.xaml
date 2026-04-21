@@ -192,9 +192,12 @@
                                                             <ComboBoxItem>+</ComboBoxItem>
                                                             <ComboBoxItem>-</ComboBoxItem>
                                                         </ComboBox>
-                                                        <TextBox Text="{Binding OffsetMinutes, UpdateSourceTrigger=PropertyChanged}" Width="60"
-                                                                 ToolTip="Number of minutes before or after T to capture this decoy"/>
-                                                        <TextBlock Text="min" Style="{StaticResource Label}" Margin="6,0,8,0"/>
+                                                        <TextBox Text="{Binding OffsetHours, UpdateSourceTrigger=PropertyChanged}" Width="42"
+                                                                 ToolTip="Hours component of the offset"/>
+                                                        <TextBlock Text="h" Style="{StaticResource Label}" Margin="3,0,6,0"/>
+                                                        <TextBox Text="{Binding OffsetMinutes, UpdateSourceTrigger=PropertyChanged}" Width="42"
+                                                                 ToolTip="Minutes component of the offset"/>
+                                                        <TextBlock Text="m" Style="{StaticResource Label}" Margin="3,0,8,0"/>
                                                         <Button Content="Remove" Style="{StaticResource SecondaryButton}" Padding="6,3" FontSize="11"
                                                                 Command="{Binding DataContext.RemoveDecoyOffsetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                                 CommandParameter="{Binding}"/>

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using MemoryTrainer.Helpers;
 using MemoryTrainer.Models;
 
 namespace MemoryTrainer.Services;
@@ -39,6 +40,7 @@ public class SessionEngine
 
     public async Task StartSessionAsync(string name, List<(SessionCycleConfig config, List<DecoyOffset> decoys)> cycles)
     {
+        AppLogger.Log("SessionEngine", $"Starting session '{name}' with {cycles.Count} cycle config(s)");
         var session = new SessionModel
         {
             Name = name,
@@ -46,9 +48,14 @@ public class SessionEngine
         };
         session.Id = await _db.CreateSessionAsync(session);
         _activeSession = session;
+        AppLogger.Log("SessionEngine", $"Session created (id={session.Id})");
 
         bool anyAudio = cycles.Any(c => c.config.AudioEnabled);
-        if (anyAudio) _audioCaptureService.StartBuffer();
+        if (anyAudio)
+        {
+            _audioCaptureService.StartBuffer();
+            AppLogger.Log("SessionEngine", "Audio buffer started");
+        }
 
         foreach (var (config, decoys) in cycles)
         {
@@ -63,6 +70,7 @@ public class SessionEngine
             var runner = CreateRunner(config, decoys, session.Id);
             _runners.Add(runner);
             runner.Start();
+            AppLogger.Log("SessionEngine", $"Runner started for config {config.Id} (base={TimeSpan.FromTicks(config.BaseDurationTicks).TotalMinutes:F1}m, audio={config.AudioEnabled}, camera={config.CameraEnabled})");
         }
 
         SessionStateChanged?.Invoke();
@@ -71,6 +79,7 @@ public class SessionEngine
     public async Task PauseAsync()
     {
         if (_activeSession == null) return;
+        AppLogger.Log("SessionEngine", $"Pausing session {_activeSession.Id}");
         _audioCaptureService.StopBuffer();
         foreach (var runner in _runners)
             runner.Pause();
@@ -82,6 +91,7 @@ public class SessionEngine
     public async Task ResumeAsync()
     {
         if (_activeSession == null) return;
+        AppLogger.Log("SessionEngine", $"Resuming session {_activeSession.Id}");
         bool anyAudio = _runners.Any(r => r.Config.AudioEnabled);
         if (anyAudio) _audioCaptureService.StartBuffer();
         foreach (var runner in _runners)
@@ -94,6 +104,7 @@ public class SessionEngine
     public async Task StopAsync(bool closePromptWindow = false)
     {
         if (_activeSession == null) return;
+        AppLogger.Log("SessionEngine", $"Stopping session {_activeSession.Id}");
 
         _audioCaptureService.StopBuffer();
 
@@ -104,6 +115,7 @@ public class SessionEngine
             if (record != null && record.Status != CycleStatus.Completed
                 && record.Status != CycleStatus.Missed && record.Status != CycleStatus.Incomplete)
             {
+                AppLogger.Log("SessionEngine", $"Marking cycle {record.Id} as Incomplete (was {record.Status})");
                 record.Status = CycleStatus.Incomplete;
                 await _db.UpdateCycleRecordAsync(record);
             }
@@ -113,11 +125,13 @@ public class SessionEngine
         _activeSession.IsCompleted = true;
         _runners.Clear();
         while (_promptQueue.TryDequeue(out _)) { }
+        AppLogger.Log("SessionEngine", $"Session {_activeSession.Id} stopped");
         SessionStateChanged?.Invoke();
     }
 
     public async Task RestoreSessionAsync(SessionModel session)
     {
+        AppLogger.Log("SessionEngine", $"Restoring session {session.Id} ('{session.Name}')");
         _activeSession = session;
         var configs = await _db.GetConfigsBySessionAsync(session.Id);
 
@@ -132,9 +146,15 @@ public class SessionEngine
 
             var activeCycle = await _db.GetLatestActiveCycleAsync(config.Id);
             if (activeCycle != null)
+            {
+                AppLogger.Log("SessionEngine", $"Restoring active cycle {activeCycle.Id} (status={activeCycle.Status}) for config {config.Id}");
                 await runner.RestoreAsync(activeCycle);
+            }
             else
+            {
+                AppLogger.Log("SessionEngine", $"No active cycle for config {config.Id}, starting fresh");
                 runner.Start();
+            }
         }
 
         SessionStateChanged?.Invoke();
@@ -142,6 +162,7 @@ public class SessionEngine
 
     public async Task EvaluationCompleteAsync(CycleRecord record)
     {
+        AppLogger.Log("SessionEngine", $"Evaluation complete for cycle {record.Id}");
         record.Status = CycleStatus.Completed;
         record.CompletedUtc = DateTime.UtcNow;
         await _db.UpdateCycleRecordAsync(record);
@@ -164,6 +185,8 @@ public class SessionEngine
         while (_promptQueue.TryDequeue(out _)) { }
         foreach (var r in list) _promptQueue.Enqueue(r);
 
+        AppLogger.Log("SessionEngine", $"Prompt enqueued for cycle {record.Id} (queue size={_promptQueue.Count})");
+
         lock (_promptLock)
         {
             if (!_promptWindowOpen)
@@ -180,6 +203,7 @@ public class SessionEngine
     {
         if (_promptQueue.TryDequeue(out var next))
         {
+            AppLogger.Log("SessionEngine", $"Dequeuing prompt for cycle {next.Id}");
             System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
             {
                 ShowPromptRequested?.Invoke(next);
@@ -197,7 +221,7 @@ public class SessionEngine
         };
         runner.StatusChanged += (r, status) =>
         {
-            System.Diagnostics.Debug.WriteLine($"[SessionEngine] Runner {r.Config.Id}: {status}");
+            AppLogger.Log("SessionEngine", $"Runner config={r.Config.Id}: {status}");
             SessionStateChanged?.Invoke();
         };
         return runner;

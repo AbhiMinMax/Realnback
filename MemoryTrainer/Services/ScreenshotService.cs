@@ -1,3 +1,4 @@
+using MemoryTrainer.Helpers;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
@@ -45,7 +46,15 @@ public class ScreenshotService
         else // auto-hidden taskbar: black out bottom-right corner with a safe default
             g.FillRectangle(Brushes.Black, screen.Width - NotifWidth, screen.Height - 50, NotifWidth, 50);
 
-        bmp.Save(fullPath, ImageFormat.Png);
+        try
+        {
+            bmp.Save(fullPath, ImageFormat.Png);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ScreenshotService", $"Failed to save screenshot to {fullPath}", ex);
+            throw;
+        }
         return fullPath;
     }
 }

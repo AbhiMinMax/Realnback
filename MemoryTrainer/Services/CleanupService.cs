@@ -1,5 +1,6 @@
 using MemoryTrainer.Helpers;
 using MemoryTrainer.Models;
+using static MemoryTrainer.Helpers.AppLogger;
 
 namespace MemoryTrainer.Services;
 
@@ -18,8 +19,12 @@ public class CleanupService
 
         var cutoffUtc = cycleRecord.ScreenshotTakenUtc.Value - TimeSpan.FromTicks(4 * cycleRecord.ActualDurationTicks);
         var captures = await _db.GetCapturesByConfigAsync(cycleRecord.SessionCycleConfigId);
+        var toDelete = captures.Where(c => c.TakenAtUtc < cutoffUtc && !c.IsDeleted).ToList();
 
-        foreach (var capture in captures.Where(c => c.TakenAtUtc < cutoffUtc && !c.IsDeleted))
+        if (toDelete.Count > 0)
+            Log("CleanupService", $"Deleting {toDelete.Count} capture(s) older than {cutoffUtc:HH:mm:ss}Z (cycle {cycleRecord.Id})");
+
+        foreach (var capture in toDelete)
         {
             try
             {
@@ -29,7 +34,7 @@ public class CleanupService
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[CleanupService] Failed to delete capture {capture.Id}: {ex.Message}");
+                Error("CleanupService", $"Failed to delete capture {capture.Id} ({capture.FilePath})", ex);
             }
         }
     }
@@ -37,6 +42,7 @@ public class CleanupService
     public async Task DeleteSessionCaptureFilesAsync(int sessionId)
     {
         var captures = await _db.GetCapturesBySessionAsync(sessionId);
+        Log("CleanupService", $"Deleting {captures.Count} capture file(s) for session {sessionId}");
         foreach (var capture in captures)
         {
             try
@@ -46,7 +52,7 @@ public class CleanupService
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[CleanupService] Failed to delete capture file {capture.FilePath}: {ex.Message}");
+                Error("CleanupService", $"Failed to delete capture file {capture.FilePath}", ex);
             }
             await _db.MarkCaptureDeletedAsync(capture.Id);
         }
@@ -54,16 +60,17 @@ public class CleanupService
 
     public async Task DeleteAllCapturedMediaAsync()
     {
+        Log("CleanupService", "Deleting all captured media");
         DeleteFolder(PathHelper.ScreenshotsPath);
         DeleteFolder(PathHelper.AudioPath);
         DeleteFolder(PathHelper.CameraPath);
 
-        // Recreate empty folders so the app continues to function
         Directory.CreateDirectory(PathHelper.ScreenshotsPath);
         Directory.CreateDirectory(PathHelper.AudioPath);
         Directory.CreateDirectory(PathHelper.CameraPath);
 
         await _db.MarkAllCapturesDeletedAsync();
+        Log("CleanupService", "All captured media deleted");
     }
 
     private static void DeleteFolder(string path)
@@ -74,7 +81,7 @@ public class CleanupService
             try { File.Delete(file); }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[CleanupService] Failed to delete {file}: {ex.Message}");
+                Error("CleanupService", $"Failed to delete file {file}", ex);
             }
         }
     }

@@ -1,4 +1,5 @@
 using AForge.Video.DirectShow;
+using MemoryTrainer.Helpers;
 using System.Drawing;
 using System.Drawing.Imaging;
 
@@ -15,13 +16,13 @@ public class CameraCaptureService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[CameraCaptureService] Failed to enumerate devices: {ex.Message}");
+            AppLogger.Error("CameraCaptureService", "Failed to enumerate video devices", ex);
             return null;
         }
 
         if (devices.Count == 0)
         {
-            System.Diagnostics.Debug.WriteLine("[CameraCaptureService] No video capture devices found");
+            AppLogger.Warn("CameraCaptureService", "No video capture devices found");
             return null;
         }
 
@@ -45,17 +46,17 @@ public class CameraCaptureService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[CameraCaptureService] Capture failed: {ex.Message}");
+            AppLogger.Error("CameraCaptureService", "Camera capture failed", ex);
         }
         finally
         {
             try { device?.SignalToStop(); device?.WaitForStop(); }
-            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[CameraCaptureService] Stop failed: {ex.Message}"); }
+            catch (Exception ex) { AppLogger.Error("CameraCaptureService", "Failed to stop camera device", ex); }
         }
 
         if (frame == null)
         {
-            System.Diagnostics.Debug.WriteLine("[CameraCaptureService] No frame captured within timeout");
+            AppLogger.Warn("CameraCaptureService", "No frame captured within 5s timeout");
             return null;
         }
 
@@ -63,11 +64,12 @@ public class CameraCaptureService
         {
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
             frame.Save(outputPath, ImageFormat.Png);
+            AppLogger.Log("CameraCaptureService", $"Frame saved → {outputPath}");
             return outputPath;
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[CameraCaptureService] Failed to save frame: {ex.Message}");
+            AppLogger.Error("CameraCaptureService", $"Failed to save frame to {outputPath}", ex);
             return null;
         }
         finally

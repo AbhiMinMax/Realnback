@@ -22,9 +22,11 @@ public partial class App : Application
         LiveCharts.Configure(config => config.AddDarkTheme());
 
         PathHelper.EnsureDataDirectories();
+        AppLogger.Log("App", $"Starting up — data folder: {PathHelper.DataFolder}");
 
         var db = new DatabaseService(PathHelper.DatabasePath);
         db.InitialiseSchema();
+        AppLogger.Log("App", "Database schema initialized");
 
         var screenshotService = new ScreenshotService(PathHelper.ScreenshotsPath);
         var audioCaptureService = new AudioCaptureService();
@@ -40,15 +42,22 @@ public partial class App : Application
 
         var incompleteSession = db.GetIncompleteSessionAsync().GetAwaiter().GetResult();
         if (incompleteSession != null)
+        {
+            AppLogger.Log("App", $"Incomplete session found (id={incompleteSession.Id}, name='{incompleteSession.Name}'), offering restore");
             mainVm.OfferSessionRestore(incompleteSession);
+        }
         else
+        {
+            AppLogger.Log("App", "No incomplete session — showing config");
             mainVm.ShowConfig();
+        }
 
         mainWindow.Show();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        AppLogger.Log("App", "Shutting down");
         _trayService?.Dispose();
         base.OnExit(e);
     }
@@ -57,27 +66,24 @@ public partial class App : Application
     {
         DispatcherUnhandledException += (_, args) =>
         {
-            LogError(args.Exception);
+            LogUnhandled(args.Exception);
             args.Handled = true;
         };
 
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
             if (args.ExceptionObject is Exception ex)
-                LogError(ex);
+                LogUnhandled(ex);
         };
     }
 
-    private static void LogError(Exception ex)
+    private static void LogUnhandled(Exception ex)
     {
+        AppLogger.Error("App", "Unhandled exception", ex);
         try
         {
             File.AppendAllText(PathHelper.ErrorLogPath, $"[{DateTime.UtcNow:O}] {ex}{Environment.NewLine}");
         }
-        catch
-        {
-            // Swallow — error.log write failed
-        }
-        System.Diagnostics.Debug.WriteLine($"[App] Unhandled exception: {ex}");
+        catch { }
     }
 }

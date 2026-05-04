@@ -8,6 +8,7 @@ public static class PathHelper
     public static string DataFolder => Path.Combine(AppFolder, "data");
     public static string DatabasePath => Path.Combine(DataFolder, "memorytrainer.db");
     public static string ErrorLogPath => Path.Combine(DataFolder, "error.log");
+    public static string AppLogPath => Path.Combine(DataFolder, "app.log");
     public static string SettingsFilePath => Path.Combine(DataFolder, "appsettings.json");
 
     private static string? _screenshotsPathOverride;
@@ -68,7 +69,7 @@ public static class PathHelper
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[PathHelper] Failed to load settings: {ex.Message}");
+            AppLogger.Error("PathHelper", "Failed to load settings", ex);
         }
     }
 
@@ -82,7 +83,7 @@ public static class PathHelper
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[PathHelper] Failed to save settings: {ex.Message}");
+            AppLogger.Error("PathHelper", "Failed to save settings", ex);
         }
     }
 }

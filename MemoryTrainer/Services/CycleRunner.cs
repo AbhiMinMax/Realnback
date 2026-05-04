@@ -1,5 +1,6 @@
 using MemoryTrainer.Helpers;
 using MemoryTrainer.Models;
+using static MemoryTrainer.Helpers.AppLogger;
 
 namespace MemoryTrainer.Services;
 
@@ -40,9 +41,12 @@ public class CycleRunner
         _sessionId = sessionId;
     }
 
+    private string Tag => $"CycleRunner:{_config.Id}";
+
     public void Start(int startingCycleNumber = 1)
     {
         _cycleNumber = startingCycleNumber;
+        Log(Tag, $"Starting at cycle {startingCycleNumber}");
         _ = RunLoopAsync(_cts.Token);
     }
 
@@ -55,11 +59,17 @@ public class CycleRunner
         {
             var remaining = _currentRecord.ScheduledScreenshotUtc - now;
             _pausedScreenshotRemaining = remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
+            Log(Tag, $"Paused — waiting for screenshot, {_pausedScreenshotRemaining.Value.TotalSeconds:F0}s remaining");
         }
         else if (_currentRecord.Status == CycleStatus.ScreenshotTaken && _currentRecord.PromptDueUtc.HasValue)
         {
             var remaining = _currentRecord.PromptDueUtc.Value - now;
             _pausedPromptRemaining = remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
+            Log(Tag, $"Paused — waiting for prompt, {_pausedPromptRemaining.Value.TotalSeconds:F0}s remaining");
+        }
+        else
+        {
+            Log(Tag, $"Paused (cycle {_currentRecord.CycleNumber}, status={_currentRecord.Status})");
         }
 
         _cts.Cancel();
@@ -67,12 +77,14 @@ public class CycleRunner
 
     public void Resume()
     {
+        Log(Tag, $"Resuming cycle {_cycleNumber}");
         _cts = new CancellationTokenSource();
         _ = RunLoopAsync(_cts.Token, resuming: true);
     }
 
     public void Stop()
     {
+        Log(Tag, "Stop requested");
         _cts.Cancel();
     }
 
@@ -81,12 +93,14 @@ public class CycleRunner
         _cycleNumber = record.CycleNumber;
         _currentRecord = record;
         var now = DateTime.UtcNow;
+        Log(Tag, $"Restoring cycle {record.CycleNumber} (id={record.Id}, status={record.Status})");
 
         switch (record.Status)
         {
             case CycleStatus.WaitingForScreenshot:
                 if (record.ScheduledScreenshotUtc <= now)
                 {
+                    Log(Tag, $"Cycle {record.CycleNumber} missed — screenshot window passed while app was closed");
                     record.Status = CycleStatus.Missed;
                     record.MissedReason = "App was closed";
                     await _db.UpdateCycleRecordAsync(record);
@@ -97,6 +111,7 @@ public class CycleRunner
                 else
                 {
                     _pausedScreenshotRemaining = record.ScheduledScreenshotUtc - now;
+                    Log(Tag, $"Resuming screenshot wait, {_pausedScreenshotRemaining.Value.TotalSeconds:F0}s remaining");
                     Resume();
                 }
                 break;
@@ -104,6 +119,7 @@ public class CycleRunner
             case CycleStatus.ScreenshotTaken:
                 if (record.PromptDueUtc.HasValue && record.PromptDueUtc.Value <= now)
                 {
+                    Log(Tag, $"Cycle {record.CycleNumber} prompt overdue, queuing immediately");
                     record.Status = CycleStatus.PromptQueued;
                     await _db.UpdateCycleRecordAsync(record);
                     StatusChanged?.Invoke(this, "Prompt queued");
@@ -112,18 +128,21 @@ public class CycleRunner
                 else
                 {
                     _pausedPromptRemaining = record.PromptDueUtc.HasValue ? record.PromptDueUtc.Value - now : TimeSpan.FromMinutes(1);
+                    Log(Tag, $"Resuming prompt wait, {_pausedPromptRemaining.Value.TotalSeconds:F0}s remaining");
                     Resume();
                 }
                 break;
 
             case CycleStatus.PromptQueued:
             case CycleStatus.PromptShown:
+                Log(Tag, $"Cycle {record.CycleNumber} prompt was queued/shown, re-queuing");
                 record.Status = CycleStatus.PromptQueued;
                 await _db.UpdateCycleRecordAsync(record);
                 await (PromptReady?.Invoke(record) ?? Task.CompletedTask);
                 break;
 
             default:
+                Log(Tag, $"Cycle {record.CycleNumber} status {record.Status} not resumable, starting next");
                 _cycleNumber++;
                 Start(_cycleNumber);
                 break;
@@ -142,11 +161,12 @@ public class CycleRunner
             }
             catch (OperationCanceledException)
             {
+                Log(Tag, "Run loop cancelled");
                 break;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[CycleRunner:{_config.Id}] Unhandled exception: {ex}");
+                Error(Tag, "Unhandled exception in run loop", ex);
                 break;
             }
         }
@@ -187,6 +207,7 @@ public class CycleRunner
             };
             record.Id = await _db.CreateCycleRecordAsync(record);
             _currentRecord = record;
+            Log(Tag, $"Cycle {_cycleNumber} started (id={record.Id}, duration={TimeSpan.FromTicks(actualTicks).TotalMinutes:F1}m, screenshot at {screenshotTime:HH:mm:ss}Z)");
             StatusChanged?.Invoke(this, "Screenshot scheduled");
         }
 
@@ -207,6 +228,7 @@ public class CycleRunner
 
             // Main screenshot
             var screenshotPath = _screenshotService.Capture(_sessionId, record.Id, isMain: true, offsetMinutes: null);
+            Log(Tag, $"Cycle {record.CycleNumber}: screenshot captured → {screenshotPath}");
             var screenshotCapture = new CaptureRecord
             {
                 CycleRecordId = record.Id,
@@ -227,6 +249,10 @@ public class CycleRunner
                 {
                     var result = await _audioCaptureService.CaptureAsync(audioPath);
                     var availability = result != null ? CaptureAvailability.Captured : CaptureAvailability.Skipped_NoAudio;
+                    if (result != null)
+                        Log(Tag, $"Cycle {record.CycleNumber}: audio captured → {result}");
+                    else
+                        Warn(Tag, $"Cycle {record.CycleNumber}: audio capture skipped (silent/unavailable)");
                     var audioCapture = new CaptureRecord
                     {
                         CycleRecordId = record.Id,
@@ -247,6 +273,10 @@ public class CycleRunner
                     $"{record.Id}_camera_{Guid.NewGuid():N}.png");
                 var result = _cameraCaptureService.Capture(cameraPath);
                 var availability = result != null ? CaptureAvailability.Captured : CaptureAvailability.Skipped_DeviceUnavailable;
+                if (result != null)
+                    Log(Tag, $"Cycle {record.CycleNumber}: camera captured → {result}");
+                else
+                    Warn(Tag, $"Cycle {record.CycleNumber}: camera capture skipped (device unavailable)");
                 var cameraCapture = new CaptureRecord
                 {
                     CycleRecordId = record.Id,
@@ -263,6 +293,7 @@ public class CycleRunner
             record.PromptDueUtc = record.ScreenshotTakenUtc + TimeSpan.FromTicks(record.ActualDurationTicks);
             record.Status = CycleStatus.ScreenshotTaken;
             await _db.UpdateCycleRecordAsync(record);
+            Log(Tag, $"Cycle {record.CycleNumber}: prompt due at {record.PromptDueUtc:HH:mm:ss}Z");
             StatusChanged?.Invoke(this, "Screenshot taken, waiting for prompt");
 
             _pausedScreenshotRemaining = null;
@@ -284,6 +315,7 @@ public class CycleRunner
 
             record.Status = CycleStatus.PromptQueued;
             await _db.UpdateCycleRecordAsync(record);
+            Log(Tag, $"Cycle {record.CycleNumber}: prompt queued");
             StatusChanged?.Invoke(this, "Prompt queued");
             _pausedPromptRemaining = null;
 
@@ -319,7 +351,7 @@ public class CycleRunner
 
             if (wait <= TimeSpan.Zero)
             {
-                System.Diagnostics.Debug.WriteLine($"[CycleRunner:{_config.Id}] Decoy offset {decoy.OffsetMinutes}m skipped — time already passed");
+                Warn(Tag, $"Decoy offset {decoy.OffsetMinutes}m skipped — capture time already passed");
                 continue;
             }
 
@@ -343,6 +375,7 @@ public class CycleRunner
             ct.ThrowIfCancellationRequested();
 
             var path = _screenshotService.Capture(_sessionId, record.Id, isMain: false, offsetMinutes: decoy.OffsetMinutes);
+            Log(Tag, $"Cycle {record.CycleNumber}: decoy screenshot (+{decoy.OffsetMinutes}m) captured → {path}");
             var captureRecord = new CaptureRecord
             {
                 CycleRecordId = record.Id,
@@ -364,7 +397,7 @@ public class CycleRunner
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[CycleRunner:{_config.Id}] Decoy screenshot capture failed: {ex.Message}");
+            Error(Tag, $"Decoy screenshot capture failed (offset={decoy.OffsetMinutes}m)", ex);
         }
     }
 
@@ -379,6 +412,10 @@ public class CycleRunner
                 $"{record.Id}_audiodecoy_{Guid.NewGuid():N}.wav");
             var result = await _audioCaptureService!.CaptureAsync(path);
             var availability = result != null ? CaptureAvailability.Captured : CaptureAvailability.Skipped_NoAudio;
+            if (result != null)
+                Log(Tag, $"Cycle {record.CycleNumber}: decoy audio (+{decoy.OffsetMinutes}m) captured → {result}");
+            else
+                Warn(Tag, $"Cycle {record.CycleNumber}: decoy audio (+{decoy.OffsetMinutes}m) skipped (silent/unavailable)");
             var captureRecord = new CaptureRecord
             {
                 CycleRecordId = record.Id,
@@ -394,7 +431,7 @@ public class CycleRunner
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[CycleRunner:{_config.Id}] Decoy audio capture failed: {ex.Message}");
+            Error(Tag, $"Decoy audio capture failed (offset={decoy.OffsetMinutes}m)", ex);
         }
     }
 
@@ -409,6 +446,10 @@ public class CycleRunner
                 $"{record.Id}_cameradecoy_{Guid.NewGuid():N}.png");
             var result = _cameraCaptureService!.Capture(path);
             var availability = result != null ? CaptureAvailability.Captured : CaptureAvailability.Skipped_DeviceUnavailable;
+            if (result != null)
+                Log(Tag, $"Cycle {record.CycleNumber}: decoy camera (+{decoy.OffsetMinutes}m) captured → {result}");
+            else
+                Warn(Tag, $"Cycle {record.CycleNumber}: decoy camera (+{decoy.OffsetMinutes}m) skipped (device unavailable)");
             var captureRecord = new CaptureRecord
             {
                 CycleRecordId = record.Id,
@@ -424,7 +465,7 @@ public class CycleRunner
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[CycleRunner:{_config.Id}] Decoy camera capture failed: {ex.Message}");
+            Error(Tag, $"Decoy camera capture failed (offset={decoy.OffsetMinutes}m)", ex);
         }
     }
 

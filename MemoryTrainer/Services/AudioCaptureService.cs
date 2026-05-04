@@ -1,3 +1,4 @@
+using MemoryTrainer.Helpers;
 using NAudio.Wave;
 
 namespace MemoryTrainer.Services;
@@ -27,11 +28,11 @@ public class AudioCaptureService : IDisposable
             _capture.DataAvailable += OnData;
             _capture.StartRecording();
             _running = true;
-            System.Diagnostics.Debug.WriteLine("[AudioCaptureService] WASAPI loopback buffer started");
+            AppLogger.Log("AudioCaptureService", "WASAPI loopback buffer started");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[AudioCaptureService] Failed to start loopback: {ex.Message}");
+            AppLogger.Error("AudioCaptureService", "Failed to start loopback buffer", ex);
             _capture?.Dispose();
             _capture = null;
             _running = false;
@@ -49,7 +50,7 @@ public class AudioCaptureService : IDisposable
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[AudioCaptureService] Error stopping buffer: {ex.Message}");
+            AppLogger.Error("AudioCaptureService", "Error stopping buffer", ex);
         }
         _running = false;
         lock (_bufferLock) { _chunks.Clear(); _totalBytes = 0; }
@@ -76,7 +77,7 @@ public class AudioCaptureService : IDisposable
     {
         if (!_running || _format == null)
         {
-            System.Diagnostics.Debug.WriteLine("[AudioCaptureService] Buffer not running, trying mic fallback");
+            AppLogger.Warn("AudioCaptureService", "Buffer not running — trying mic fallback");
             return await TryMicFallbackAsync(outputPath);
         }
 
@@ -89,7 +90,7 @@ public class AudioCaptureService : IDisposable
 
         if (IsSilent(audio, _format))
         {
-            System.Diagnostics.Debug.WriteLine("[AudioCaptureService] Loopback silence, trying mic fallback");
+            AppLogger.Warn("AudioCaptureService", "Loopback audio is silent — trying mic fallback");
             return await TryMicFallbackAsync(outputPath);
         }
 
@@ -117,15 +118,16 @@ public class AudioCaptureService : IDisposable
             var all = Combine(chunks);
             if (IsSilent(all, fmt))
             {
-                System.Diagnostics.Debug.WriteLine("[AudioCaptureService] Mic also silent, skipping audio capture");
+                AppLogger.Warn("AudioCaptureService", "Mic also silent — skipping audio capture");
                 return null;
             }
             WriteWav(all, fmt, outputPath);
+            AppLogger.Log("AudioCaptureService", $"Mic fallback captured → {outputPath}");
             return outputPath;
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[AudioCaptureService] Mic fallback failed: {ex.Message}");
+            AppLogger.Error("AudioCaptureService", "Mic fallback failed", ex);
             return null;
         }
     }

@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using MemoryTrainer.Helpers;
 using MemoryTrainer.Models;
 using MemoryTrainer.Services;
+using static MemoryTrainer.Helpers.AppLogger;
 
 namespace MemoryTrainer.ViewModels;
 
@@ -164,11 +165,12 @@ public partial class RecallPromptViewModel : ObservableObject
 
         BuildTabs();
         UpdateNavigation();
+        Log("RecallPromptViewModel", $"Prompt initialized for cycle {_record.Id}: tabs=[{string.Join(", ", _tabs)}], freeRecall={FreeRecallEnabled}, recognition={RecognitionEnabled}");
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[RecallPromptViewModel] InitAsync failed: {ex}");
+            Error("RecallPromptViewModel", $"InitAsync failed for cycle {_record.Id}", ex);
         }
     }
 
@@ -432,7 +434,7 @@ public partial class RecallPromptViewModel : ObservableObject
     {
         if (_mainCapture?.FilePath == null || !File.Exists(_mainCapture.FilePath)) return;
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_mainCapture.FilePath) { UseShellExecute = true }); }
-        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[RecallPromptViewModel] Failed to open screenshot: {ex.Message}"); }
+        catch (Exception ex) { Error("RecallPromptViewModel", "Failed to open screenshot", ex); }
     }
 
     [RelayCommand]
@@ -440,7 +442,7 @@ public partial class RecallPromptViewModel : ObservableObject
     {
         if (!option.IsFileAvailable || option.Capture.FilePath == null) return;
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(option.Capture.FilePath) { UseShellExecute = true }); }
-        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[RecallPromptViewModel] Failed to open option: {ex.Message}"); }
+        catch (Exception ex) { Error("RecallPromptViewModel", "Failed to open recognition option", ex); }
     }
 
     [RelayCommand]
@@ -464,6 +466,7 @@ public partial class RecallPromptViewModel : ObservableObject
         };
         await _db.CreateFreeRecallResultAsync(freeResult);
         FreeRecallCompleted = true;
+        Log("RecallPromptViewModel", $"Free recall rated '{evalResult}' for cycle {_record.Id}");
         UpdateNavigation();
     }
 
@@ -486,6 +489,7 @@ public partial class RecallPromptViewModel : ObservableObject
         };
         await _db.CreateRecognitionResultAsync(result);
         RecognitionCompleted = true;
+        Log("RecallPromptViewModel", $"Screenshot recognition: selected {(option.IsCorrect ? "correct" : "wrong")} option for cycle {_record.Id}");
         UpdateNavigation();
     }
 
@@ -540,6 +544,7 @@ public partial class RecallPromptViewModel : ObservableObject
         };
         await _db.CreateAudioRecallResultAsync(audioResult);
         AudioRecallCompleted = true;
+        Log("RecallPromptViewModel", $"Audio recall rated '{evalResult}' for cycle {_record.Id}");
         UpdateNavigation();
     }
 
@@ -602,6 +607,7 @@ public partial class RecallPromptViewModel : ObservableObject
         };
         await _db.CreateAudioRecognitionResultAsync(result);
         AudioRecognitionCompleted = true;
+        Log("RecallPromptViewModel", $"Audio recognition: selected {(option.IsCorrect ? "correct" : "wrong")} option for cycle {_record.Id}");
         UpdateNavigation();
     }
 
@@ -619,7 +625,7 @@ public partial class RecallPromptViewModel : ObservableObject
     {
         if (_cameraCapture?.FilePath == null || !File.Exists(_cameraCapture.FilePath)) return;
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_cameraCapture.FilePath) { UseShellExecute = true }); }
-        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[RecallPromptViewModel] Failed to open camera photo: {ex.Message}"); }
+        catch (Exception ex) { Error("RecallPromptViewModel", "Failed to open camera photo", ex); }
     }
 
     [RelayCommand]
@@ -636,6 +642,7 @@ public partial class RecallPromptViewModel : ObservableObject
         };
         await _db.CreateCameraRecallResultAsync(cameraResult);
         CameraRecallCompleted = true;
+        Log("RecallPromptViewModel", $"Camera recall rated '{evalResult}' for cycle {_record.Id}");
         UpdateNavigation();
     }
 
@@ -644,7 +651,7 @@ public partial class RecallPromptViewModel : ObservableObject
     {
         if (!option.IsFileAvailable || option.Capture.FilePath == null) return;
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(option.Capture.FilePath) { UseShellExecute = true }); }
-        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[RecallPromptViewModel] Failed to open camera option: {ex.Message}"); }
+        catch (Exception ex) { Error("RecallPromptViewModel", "Failed to open camera recognition option", ex); }
     }
 
     [RelayCommand]
@@ -665,6 +672,7 @@ public partial class RecallPromptViewModel : ObservableObject
         };
         await _db.CreateCameraRecognitionResultAsync(result);
         CameraRecognitionCompleted = true;
+        Log("RecallPromptViewModel", $"Camera recognition: selected {(option.IsCorrect ? "correct" : "wrong")} option for cycle {_record.Id}");
         UpdateNavigation();
     }
 }

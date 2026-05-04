@@ -103,11 +103,11 @@
 
                 <!-- Separator -->
                 <Separator Margin="0,12,0,12"
-                           Visibility="{Binding RecognitionAvailable, Converter={StaticResource BoolToVisibility}}"/>
+                           Visibility="{Binding ShowScreenshotRecognition, Converter={StaticResource BoolToVisibility}}"/>
 
                 <!-- Recognition -->
-                <StackPanel Visibility="{Binding RecognitionAvailable, Converter={StaticResource BoolToVisibility}}">
-                    <TextBlock Text="{Binding HeaderText, StringFormat='Which of these was your screen {0}?'}"
+                <StackPanel Visibility="{Binding ShowScreenshotRecognition, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="{Binding RecognitionHeaderText}"
                                FontWeight="SemiBold" Margin="0,0,0,8" TextWrapping="Wrap"/>
                     <ItemsControl ItemsSource="{Binding RecognitionOptions}">
                         <ItemsControl.ItemTemplate>
@@ -220,7 +220,11 @@
                 <StackPanel Visibility="{Binding CameraIsVerified, Converter={StaticResource BoolToVisibility}}">
                     <Button Content="Open Photo" Style="{StaticResource LinkButton}"
                             Command="{Binding OpenCameraCaptureCommand}"
+                            IsEnabled="{Binding CameraCaptureAvailable}"
                             HorizontalAlignment="Left" Margin="0,0,0,8"/>
+                    <TextBlock Text="File unavailable" Foreground="{StaticResource ErrorBrush}" FontSize="11"
+                               Visibility="{Binding CameraCaptureAvailable, Converter={StaticResource InverseBoolToVisibility}}"
+                               Margin="0,0,0,8"/>
                     <StackPanel Visibility="{Binding CameraRecallCompleted, Converter={StaticResource InverseBoolToVisibility}}">
                         <TextBlock Text="How accurate was your recall?" Style="{StaticResource Label}" Margin="0,0,0,6"/>
                         <StackPanel Orientation="Horizontal">

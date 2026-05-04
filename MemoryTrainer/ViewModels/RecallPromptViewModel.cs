@@ -19,7 +19,7 @@ public partial class RecognitionOptionViewModel : ObservableObject
 {
     public CaptureRecord Capture { get; set; } = null!;
     public string Label { get; set; } = string.Empty;
-    public bool IsCorrect { get; set; }
+    [ObservableProperty] private bool _isCorrect;
 
     [ObservableProperty] private bool _isSelected;
     [ObservableProperty] private bool _isFileAvailable;
@@ -36,6 +36,7 @@ public partial class RecallPromptViewModel : ObservableObject
 
     // ── Tab management ──
     private readonly List<string> _tabs = new();
+    private string _durationLabel = string.Empty;
     [ObservableProperty] private int _stepIndex;
 
     public bool OnScreenshotTab => _tabs.Count > _stepIndex && _tabs[_stepIndex] == "Screenshot";
@@ -51,15 +52,17 @@ public partial class RecallPromptViewModel : ObservableObject
     [ObservableProperty] private bool _recognitionEnabled;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanVerify))] private string _recallText = string.Empty;
     [ObservableProperty] private bool _isVerified;
-    [ObservableProperty] private bool _freeRecallCompleted;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowScreenshotRecognition))] private bool _freeRecallCompleted;
     [ObservableProperty] private bool _mainCaptureAvailable;
     [ObservableProperty] private EvaluationResult? _freeRecallResult;
-    [ObservableProperty] private bool _recognitionAvailable;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowScreenshotRecognition))] private bool _recognitionAvailable;
     [ObservableProperty] private bool _recognitionCompleted;
     [ObservableProperty] private bool? _recognitionCorrect;
     private CaptureRecord? _mainCapture;
 
     public bool CanVerify => !string.IsNullOrEmpty(RecallText);
+    public bool ShowScreenshotRecognition => FreeRecallCompleted && RecognitionAvailable;
+    public string RecognitionHeaderText => $"Which of these was your screen {_durationLabel} ago?";
     public System.Collections.ObjectModel.ObservableCollection<RecognitionOptionViewModel> RecognitionOptions { get; } = new();
 
     // ── Audio tab ──
@@ -89,6 +92,7 @@ public partial class RecallPromptViewModel : ObservableObject
     [ObservableProperty] private EvaluationResult? _cameraEvalResult;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowCameraRecognition))] private bool _cameraRecognitionAvailable;
     [ObservableProperty] private bool _cameraRecognitionCompleted;
+    [ObservableProperty] private bool _cameraCaptureAvailable;
     private CaptureRecord? _cameraCapture;
 
     public bool CanVerifyCamera => !string.IsNullOrEmpty(CameraRecallText);
@@ -98,6 +102,8 @@ public partial class RecallPromptViewModel : ObservableObject
     // ── Navigation ──
     [ObservableProperty] private bool _canGoNext;
     [ObservableProperty] private bool _canDismiss;
+
+    private readonly CancellationTokenSource _initCts = new();
 
     public event Action? DismissRequested;
 
@@ -113,16 +119,18 @@ public partial class RecallPromptViewModel : ObservableObject
         RecognitionEnabled = config.RecognitionEnabled;
 
         var duration = TimeSpan.FromTicks(record.ActualDurationTicks);
-        var durationLabel = TimeFormatter.FormatDuration(duration);
-        HeaderText = $"What were you doing {durationLabel} ago?";
-        AudioHeaderText = $"What were you hearing {durationLabel} ago?";
-        CameraHeaderText = $"How were you {durationLabel} ago?";
+        _durationLabel = TimeFormatter.FormatDuration(duration);
+        HeaderText = $"What were you doing {_durationLabel} ago?";
+        AudioHeaderText = $"What were you hearing {_durationLabel} ago?";
+        CameraHeaderText = $"How were you {_durationLabel} ago?";
 
-        _ = InitAsync();
+        _ = InitAsync(_initCts.Token);
     }
 
-    private async Task InitAsync()
+    private async Task InitAsync(CancellationToken ct)
     {
+        try
+        {
         var captures = await _db.GetCapturesByCycleAsync(_record.Id);
 
         // Screenshot tab
@@ -142,12 +150,26 @@ public partial class RecallPromptViewModel : ObservableObject
         // Camera tab
         _cameraCapture = captures.FirstOrDefault(c => c.Type == CaptureType.Camera && c.IsMain
             && c.Availability == CaptureAvailability.Captured && !c.IsDeleted);
+        CameraCaptureAvailable = _cameraCapture != null && _cameraCapture.FilePath != null && File.Exists(_cameraCapture.FilePath);
 
         if (RecognitionEnabled && _cameraCapture != null)
             await BuildCameraRecognitionOptionsAsync(captures);
 
+        if (ct.IsCancellationRequested) return;
+
+        _audioPlayer.PlaybackStopped += () =>
+            System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => AudioIsPlaying = false);
+
+        _record.PromptShownUtc = DateTime.UtcNow;
+
         BuildTabs();
         UpdateNavigation();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[RecallPromptViewModel] InitAsync failed: {ex}");
+        }
     }
 
     private void BuildTabs()
@@ -386,7 +408,6 @@ public partial class RecallPromptViewModel : ObservableObject
     {
         if (IsLastTab) { await DoneAsync(); return; }
         _stepIndex++;
-        OnPropertyChanged(nameof(StepIndex));
         OnPropertyChanged(nameof(OnScreenshotTab));
         OnPropertyChanged(nameof(OnAudioTab));
         OnPropertyChanged(nameof(OnCameraTab));
@@ -396,11 +417,9 @@ public partial class RecallPromptViewModel : ObservableObject
     [RelayCommand]
     private async Task DoneAsync()
     {
-        _audioPlayer.Stop();
+        _initCts.Cancel();
         _audioPlayer.Dispose();
-        _audioOptionPlayer.Stop();
         _audioOptionPlayer.Dispose();
-        _record.PromptShownUtc = DateTime.UtcNow;
         await _engine.EvaluationCompleteAsync(_record);
         CanDismiss = true;
         DismissRequested?.Invoke();
@@ -451,6 +470,7 @@ public partial class RecallPromptViewModel : ObservableObject
     [RelayCommand]
     private async Task SelectOptionAsync(RecognitionOptionViewModel option)
     {
+        if (RecognitionCompleted) return;
         foreach (var o in RecognitionOptions) o.IsSelected = false;
         option.IsSelected = true;
         RecognitionCorrect = option.IsCorrect;
@@ -476,10 +496,6 @@ public partial class RecallPromptViewModel : ObservableObject
     {
         if (string.IsNullOrEmpty(AudioRecallText)) return;
         AudioIsVerified = true;
-        _audioPlayer.PlaybackStopped += () =>
-        {
-            AudioIsPlaying = false;
-        };
     }
 
     [RelayCommand]
@@ -530,18 +546,18 @@ public partial class RecallPromptViewModel : ObservableObject
     [RelayCommand]
     private void PlayStopAudioOption(RecognitionOptionViewModel option)
     {
-        // If this option is already playing, stop it
         if (_playingAudioOption == option && _audioOptionPlayer.IsPlaying)
         {
+            _audioOptionPlayer.PlaybackStopped -= OnAudioOptionStopped;
             _audioOptionPlayer.Stop();
             option.IsPlaying = false;
             _playingAudioOption = null;
             return;
         }
 
-        // Stop any previously playing option
         if (_playingAudioOption != null)
         {
+            _audioOptionPlayer.PlaybackStopped -= OnAudioOptionStopped;
             _audioOptionPlayer.Stop();
             _playingAudioOption.IsPlaying = false;
             _playingAudioOption = null;
@@ -558,16 +574,20 @@ public partial class RecallPromptViewModel : ObservableObject
     private void OnAudioOptionStopped()
     {
         _audioOptionPlayer.PlaybackStopped -= OnAudioOptionStopped;
-        if (_playingAudioOption != null)
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
         {
-            _playingAudioOption.IsPlaying = false;
-            _playingAudioOption = null;
-        }
+            if (_playingAudioOption != null)
+            {
+                _playingAudioOption.IsPlaying = false;
+                _playingAudioOption = null;
+            }
+        });
     }
 
     [RelayCommand]
     private async Task SelectAudioOptionAsync(RecognitionOptionViewModel option)
     {
+        if (AudioRecognitionCompleted) return;
         foreach (var o in AudioRecognitionOptions) o.IsSelected = false;
         option.IsSelected = true;
 
@@ -630,6 +650,7 @@ public partial class RecallPromptViewModel : ObservableObject
     [RelayCommand]
     private async Task SelectCameraOptionAsync(RecognitionOptionViewModel option)
     {
+        if (CameraRecognitionCompleted) return;
         foreach (var o in CameraRecognitionOptions) o.IsSelected = false;
         option.IsSelected = true;
 

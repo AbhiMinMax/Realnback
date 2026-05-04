@@ -127,6 +127,26 @@ public class DatabaseService
                 FOREIGN KEY (CycleRecordId) REFERENCES CycleRecords(Id)
             );
 
+            CREATE TABLE IF NOT EXISTS AudioRecognitionResults (
+                Id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+                CycleRecordId               INTEGER NOT NULL UNIQUE,
+                SelectedCaptureRecordId     INTEGER NOT NULL,
+                CorrectCaptureRecordId      INTEGER NOT NULL,
+                IsCorrect                   INTEGER NOT NULL,
+                EvaluatedAtUtc              TEXT NOT NULL,
+                FOREIGN KEY (CycleRecordId) REFERENCES CycleRecords(Id)
+            );
+
+            CREATE TABLE IF NOT EXISTS CameraRecognitionResults (
+                Id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+                CycleRecordId               INTEGER NOT NULL UNIQUE,
+                SelectedCaptureRecordId     INTEGER NOT NULL,
+                CorrectCaptureRecordId      INTEGER NOT NULL,
+                IsCorrect                   INTEGER NOT NULL,
+                EvaluatedAtUtc              TEXT NOT NULL,
+                FOREIGN KEY (CycleRecordId) REFERENCES CycleRecords(Id)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_cyclerecords_configid ON CycleRecords(SessionCycleConfigId);
             CREATE INDEX IF NOT EXISTS idx_cyclerecords_status ON CycleRecords(Status);
             CREATE INDEX IF NOT EXISTS idx_screenshots_cyclerecordid ON ScreenshotRecords(CycleRecordId);
@@ -135,6 +155,8 @@ public class DatabaseService
             CREATE INDEX IF NOT EXISTS idx_recognition_cyclerecordid ON RecognitionResults(CycleRecordId);
             CREATE INDEX IF NOT EXISTS idx_audiorecall_cyclerecordid ON AudioRecallResults(CycleRecordId);
             CREATE INDEX IF NOT EXISTS idx_camerarecall_cyclerecordid ON CameraRecallResults(CycleRecordId);
+            CREATE INDEX IF NOT EXISTS idx_audiorecognition_cyclerecordid ON AudioRecognitionResults(CycleRecordId);
+            CREATE INDEX IF NOT EXISTS idx_camerarecognition_cyclerecordid ON CameraRecognitionResults(CycleRecordId);
         ");
 
         // Migrations for existing DBs — ignore if column already exists
@@ -616,6 +638,44 @@ public class DatabaseService
                     result.CycleRecordId,
                     SelectedScreenshotRecordId = result.SelectedCaptureRecordId,
                     CorrectScreenshotRecordId = result.CorrectCaptureRecordId,
+                    IsCorrect = result.IsCorrect ? 1 : 0,
+                    EvaluatedAtUtc = result.EvaluatedAtUtc.ToString("O")
+                });
+        });
+    }
+
+    public async Task CreateAudioRecognitionResultAsync(RecognitionResult result)
+    {
+        await RetryAsync(async () =>
+        {
+            using var conn = OpenConnection();
+            await conn.ExecuteAsync(@"
+                INSERT INTO AudioRecognitionResults (CycleRecordId, SelectedCaptureRecordId, CorrectCaptureRecordId, IsCorrect, EvaluatedAtUtc)
+                VALUES (@CycleRecordId, @SelectedCaptureRecordId, @CorrectCaptureRecordId, @IsCorrect, @EvaluatedAtUtc)",
+                new
+                {
+                    result.CycleRecordId,
+                    SelectedCaptureRecordId = result.SelectedCaptureRecordId,
+                    CorrectCaptureRecordId = result.CorrectCaptureRecordId,
+                    IsCorrect = result.IsCorrect ? 1 : 0,
+                    EvaluatedAtUtc = result.EvaluatedAtUtc.ToString("O")
+                });
+        });
+    }
+
+    public async Task CreateCameraRecognitionResultAsync(RecognitionResult result)
+    {
+        await RetryAsync(async () =>
+        {
+            using var conn = OpenConnection();
+            await conn.ExecuteAsync(@"
+                INSERT INTO CameraRecognitionResults (CycleRecordId, SelectedCaptureRecordId, CorrectCaptureRecordId, IsCorrect, EvaluatedAtUtc)
+                VALUES (@CycleRecordId, @SelectedCaptureRecordId, @CorrectCaptureRecordId, @IsCorrect, @EvaluatedAtUtc)",
+                new
+                {
+                    result.CycleRecordId,
+                    SelectedCaptureRecordId = result.SelectedCaptureRecordId,
+                    CorrectCaptureRecordId = result.CorrectCaptureRecordId,
                     IsCorrect = result.IsCorrect ? 1 : 0,
                     EvaluatedAtUtc = result.EvaluatedAtUtc.ToString("O")
                 });

@@ -600,7 +600,7 @@ public partial class RecallPromptViewModel : ObservableObject
             IsCorrect = option.IsCorrect,
             EvaluatedAtUtc = DateTime.UtcNow
         };
-        await _db.CreateRecognitionResultAsync(result);
+        await _db.CreateAudioRecognitionResultAsync(result);
         AudioRecognitionCompleted = true;
         UpdateNavigation();
     }
@@ -663,7 +663,7 @@ public partial class RecallPromptViewModel : ObservableObject
             IsCorrect = option.IsCorrect,
             EvaluatedAtUtc = DateTime.UtcNow
         };
-        await _db.CreateRecognitionResultAsync(result);
+        await _db.CreateCameraRecognitionResultAsync(result);
         CameraRecognitionCompleted = true;
         UpdateNavigation();
     }

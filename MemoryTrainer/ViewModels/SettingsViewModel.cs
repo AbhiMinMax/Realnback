@@ -15,6 +15,7 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _statusMessage = string.Empty;
     [ObservableProperty] private string _screenshotsFolder = PathHelper.ScreenshotsPath;
     [ObservableProperty] private int _planRevealDelaySeconds = PathHelper.PlanRevealDelaySeconds;
+    [ObservableProperty] private int _minRecallCharacters = PathHelper.MinRecallCharacters;
 
     public SettingsViewModel(CleanupService cleanupService, Action onBack)
     {
@@ -23,6 +24,7 @@ public partial class SettingsViewModel : ObservableObject
         _screenshotsFolder = PathHelper.ScreenshotsPath;
         _defaultSessionNameTemplate = PathHelper.DefaultSessionNameTemplate;
         _planRevealDelaySeconds = PathHelper.PlanRevealDelaySeconds;
+        _minRecallCharacters = PathHelper.MinRecallCharacters;
     }
 
     [RelayCommand]
@@ -60,6 +62,14 @@ public partial class SettingsViewModel : ObservableObject
         if (PlanRevealDelaySeconds < 1) return;
         PathHelper.PlanRevealDelaySeconds = PlanRevealDelaySeconds;
         StatusMessage = "Plan reveal delay saved.";
+    }
+
+    [RelayCommand]
+    private void SaveMinRecallCharacters()
+    {
+        if (MinRecallCharacters < 0) return;
+        PathHelper.MinRecallCharacters = MinRecallCharacters;
+        StatusMessage = "Minimum recall length saved.";
     }
 
     [RelayCommand]

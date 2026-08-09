@@ -64,7 +64,14 @@
                     <TextBox Text="{Binding RecallText, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="True" TextWrapping="Wrap"
                              MinHeight="120" MaxHeight="200" VerticalScrollBarVisibility="Auto"
-                             IsReadOnly="{Binding IsVerified}" Margin="0,0,0,8"/>
+                             IsReadOnly="{Binding IsVerified}" Margin="0,0,0,4"/>
+                    <TextBlock FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8"
+                               Visibility="{Binding IsVerified, Converter={StaticResource InverseBoolToVisibility}}">
+                        <Run Text="{Binding RecallText.Length, Mode=OneWay}"/>
+                        <Run Text=" / "/>
+                        <Run Text="{Binding MinRecallCharacters, Mode=OneWay}"/>
+                        <Run Text=" characters minimum"/>
+                    </TextBlock>
                     <Button Content="Verify" Command="{Binding VerifyCommand}"
                             IsEnabled="{Binding CanVerify}" HorizontalAlignment="Left"
                             Visibility="{Binding IsVerified, Converter={StaticResource InverseBoolToVisibility}}"
@@ -141,7 +148,14 @@
                 <TextBox Text="{Binding AudioRecallText, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True" TextWrapping="Wrap"
                          MinHeight="100" MaxHeight="180" VerticalScrollBarVisibility="Auto"
-                         IsReadOnly="{Binding AudioIsVerified}" Margin="0,0,0,8"/>
+                         IsReadOnly="{Binding AudioIsVerified}" Margin="0,0,0,4"/>
+                <TextBlock FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8"
+                           Visibility="{Binding AudioIsVerified, Converter={StaticResource InverseBoolToVisibility}}">
+                    <Run Text="{Binding AudioRecallText.Length, Mode=OneWay}"/>
+                    <Run Text=" / "/>
+                    <Run Text="{Binding MinRecallCharacters, Mode=OneWay}"/>
+                    <Run Text=" characters minimum"/>
+                </TextBlock>
                 <Button Content="Verify" Command="{Binding VerifyAudioCommand}"
                         IsEnabled="{Binding CanVerifyAudio}" HorizontalAlignment="Left"
                         Visibility="{Binding AudioIsVerified, Converter={StaticResource InverseBoolToVisibility}}"
@@ -212,7 +226,14 @@
                 <TextBox Text="{Binding CameraRecallText, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True" TextWrapping="Wrap"
                          MinHeight="100" MaxHeight="180" VerticalScrollBarVisibility="Auto"
-                         IsReadOnly="{Binding CameraIsVerified}" Margin="0,0,0,8"/>
+                         IsReadOnly="{Binding CameraIsVerified}" Margin="0,0,0,4"/>
+                <TextBlock FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8"
+                           Visibility="{Binding CameraIsVerified, Converter={StaticResource InverseBoolToVisibility}}">
+                    <Run Text="{Binding CameraRecallText.Length, Mode=OneWay}"/>
+                    <Run Text=" / "/>
+                    <Run Text="{Binding MinRecallCharacters, Mode=OneWay}"/>
+                    <Run Text=" characters minimum"/>
+                </TextBlock>
                 <Button Content="Verify" Command="{Binding VerifyCameraCommand}"
                         IsEnabled="{Binding CanVerifyCamera}" HorizontalAlignment="Left"
                         Visibility="{Binding CameraIsVerified, Converter={StaticResource InverseBoolToVisibility}}"
@@ -283,7 +304,14 @@
                     <TextBox Text="{Binding PlanGuessText, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="True" TextWrapping="Wrap"
                              MinHeight="80" MaxHeight="160" VerticalScrollBarVisibility="Auto"
-                             IsReadOnly="{Binding PlanGuessSubmitted}" Margin="0,0,0,8"/>
+                             IsReadOnly="{Binding PlanGuessSubmitted}" Margin="0,0,0,4"/>
+                    <TextBlock FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8"
+                               Visibility="{Binding PlanGuessSubmitted, Converter={StaticResource InverseBoolToVisibility}}">
+                        <Run Text="{Binding PlanGuessText.Length, Mode=OneWay}"/>
+                        <Run Text=" / "/>
+                        <Run Text="{Binding MinRecallCharacters, Mode=OneWay}"/>
+                        <Run Text=" characters minimum"/>
+                    </TextBlock>
                     <Button Content="Submit" Command="{Binding SubmitPlanGuessCommand}"
                             IsEnabled="{Binding CanSubmitPlanGuess}" HorizontalAlignment="Left"
                             Visibility="{Binding PlanGuessSubmitted, Converter={StaticResource InverseBoolToVisibility}}"
@@ -341,7 +369,14 @@
                     <TextBox Text="{Binding NextPlanText, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="True" TextWrapping="Wrap"
                              MinHeight="80" MaxHeight="160" VerticalScrollBarVisibility="Auto"
-                             IsReadOnly="{Binding PlanCompleted}" Margin="0,0,0,8"/>
+                             IsReadOnly="{Binding PlanCompleted}" Margin="0,0,0,4"/>
+                    <TextBlock FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8"
+                               Visibility="{Binding PlanCompleted, Converter={StaticResource InverseBoolToVisibility}}">
+                        <Run Text="{Binding NextPlanText.Length, Mode=OneWay}"/>
+                        <Run Text=" / "/>
+                        <Run Text="{Binding MinRecallCharacters, Mode=OneWay}"/>
+                        <Run Text=" characters minimum"/>
+                    </TextBlock>
                     <Button Content="Submit" Command="{Binding SubmitNextPlanCommand}"
                             IsEnabled="{Binding CanSubmitNextPlan}" HorizontalAlignment="Left"
                             Visibility="{Binding PlanCompleted, Converter={StaticResource InverseBoolToVisibility}}"/>

@@ -14,6 +14,7 @@ public static class PathHelper
     private static string? _screenshotsPathOverride;
     private static string? _defaultSessionNameTemplate;
     private static int _planRevealDelaySeconds = 5;
+    private static int _minRecallCharacters = 50;
 
     public static string ScreenshotsPath
     {
@@ -42,6 +43,16 @@ public static class PathHelper
         set
         {
             _planRevealDelaySeconds = value < 1 ? 1 : value;
+            SaveSettings();
+        }
+    }
+
+    public static int MinRecallCharacters
+    {
+        get => _minRecallCharacters;
+        set
+        {
+            _minRecallCharacters = value < 0 ? 0 : value;
             SaveSettings();
         }
     }
@@ -81,6 +92,10 @@ public static class PathHelper
             {
                 _planRevealDelaySeconds = delay;
             }
+            if (doc.RootElement.TryGetProperty("MinRecallCharacters", out var el4) && el4.TryGetInt32(out var minChars) && minChars >= 0)
+            {
+                _minRecallCharacters = minChars;
+            }
         }
         catch (Exception ex)
         {
@@ -92,7 +107,7 @@ public static class PathHelper
     {
         try
         {
-            var settings = new { ScreenshotsPath = _screenshotsPathOverride, DefaultSessionNameTemplate = _defaultSessionNameTemplate, PlanRevealDelaySeconds = _planRevealDelaySeconds };
+            var settings = new { ScreenshotsPath = _screenshotsPathOverride, DefaultSessionNameTemplate = _defaultSessionNameTemplate, PlanRevealDelaySeconds = _planRevealDelaySeconds, MinRecallCharacters = _minRecallCharacters };
             var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(SettingsFilePath, json);
         }

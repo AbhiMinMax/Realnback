@@ -78,6 +78,24 @@
 
                 <Separator Background="{StaticResource BorderBrush}" Margin="0,16,0,16" MaxWidth="500" HorizontalAlignment="Left"/>
 
+                <!-- Minimum recall length -->
+                <TextBlock Text="Minimum Recall Length" Style="{StaticResource SectionHeader}" Margin="0,0,0,4"/>
+                <TextBlock Style="{StaticResource Label}" TextWrapping="Wrap" Margin="0,0,0,8" MaxWidth="500" HorizontalAlignment="Left"
+                           Text="Minimum number of characters required in any recall or plan text box before it can be submitted. Set to 0 to disable."/>
+                <Grid MaxWidth="500" HorizontalAlignment="Left" Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Width="60"
+                             Text="{Binding MinRecallCharacters, UpdateSourceTrigger=PropertyChanged}"
+                             VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Content="Save" Margin="6,0,0,0"
+                            Command="{Binding SaveMinRecallCharactersCommand}"/>
+                </Grid>
+
+                <Separator Background="{StaticResource BorderBrush}" Margin="0,16,0,16" MaxWidth="500" HorizontalAlignment="Left"/>
+
                 <!-- Danger zone -->
                 <TextBlock Text="Danger Zone" Style="{StaticResource SectionHeader}" Margin="0,0,0,8"/>
                 <Button Content="Delete All Captured Media" Style="{StaticResource DangerButton}"

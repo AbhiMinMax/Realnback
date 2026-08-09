@@ -63,7 +63,8 @@ public partial class RecallPromptViewModel : ObservableObject
     [ObservableProperty] private bool? _recognitionCorrect;
     private CaptureRecord? _mainCapture;
 
-    public bool CanVerify => !string.IsNullOrEmpty(RecallText);
+    public int MinRecallCharacters => PathHelper.MinRecallCharacters;
+    public bool CanVerify => RecallText.Trim().Length >= MinRecallCharacters;
     public bool ShowScreenshotRecognition => FreeRecallCompleted && RecognitionAvailable;
     public string RecognitionHeaderText => $"Which of these was your screen {_durationLabel} ago?";
     public System.Collections.ObjectModel.ObservableCollection<RecognitionOptionViewModel> RecognitionOptions { get; } = new();
@@ -82,7 +83,7 @@ public partial class RecallPromptViewModel : ObservableObject
     private readonly AudioPlayerService _audioOptionPlayer = new();
     private RecognitionOptionViewModel? _playingAudioOption;
 
-    public bool CanVerifyAudio => !string.IsNullOrEmpty(AudioRecallText);
+    public bool CanVerifyAudio => AudioRecallText.Trim().Length >= MinRecallCharacters;
     public string AudioPlayLabel => AudioIsPlaying ? "⏸ Pause" : "▶ Play";
     public bool ShowAudioRecognition => AudioRecallCompleted && AudioRecognitionAvailable;
     public System.Collections.ObjectModel.ObservableCollection<RecognitionOptionViewModel> AudioRecognitionOptions { get; } = new();
@@ -98,7 +99,7 @@ public partial class RecallPromptViewModel : ObservableObject
     [ObservableProperty] private bool _cameraCaptureAvailable;
     private CaptureRecord? _cameraCapture;
 
-    public bool CanVerifyCamera => !string.IsNullOrEmpty(CameraRecallText);
+    public bool CanVerifyCamera => CameraRecallText.Trim().Length >= MinRecallCharacters;
     public bool ShowCameraRecognition => CameraRecallCompleted && CameraRecognitionAvailable;
     public System.Collections.ObjectModel.ObservableCollection<RecognitionOptionViewModel> CameraRecognitionOptions { get; } = new();
 
@@ -116,10 +117,10 @@ public partial class RecallPromptViewModel : ObservableObject
     [ObservableProperty] private bool _planCompleted;
     private DispatcherTimer? _planRevealTimer;
 
-    public bool CanSubmitPlanGuess => !string.IsNullOrWhiteSpace(PlanGuessText) && !PlanGuessSubmitted;
+    public bool CanSubmitPlanGuess => PlanGuessText.Trim().Length >= MinRecallCharacters && !PlanGuessSubmitted;
     public bool ShowPlanRating => PlanRevealed && !PlanRatingCompleted;
     public bool ShowNextPlanEntry => !HasPriorPlan || PlanRatingCompleted;
-    public bool CanSubmitNextPlan => !string.IsNullOrWhiteSpace(NextPlanText) && !PlanCompleted;
+    public bool CanSubmitNextPlan => NextPlanText.Trim().Length >= MinRecallCharacters && !PlanCompleted;
 
     // ── Navigation ──
     [ObservableProperty] private bool _canGoNext;
@@ -493,7 +494,7 @@ public partial class RecallPromptViewModel : ObservableObject
     [RelayCommand]
     private void Verify()
     {
-        if (string.IsNullOrEmpty(RecallText)) return;
+        if (!CanVerify) return;
         IsVerified = true;
     }
 
@@ -543,7 +544,7 @@ public partial class RecallPromptViewModel : ObservableObject
     [RelayCommand]
     private void VerifyAudio()
     {
-        if (string.IsNullOrEmpty(AudioRecallText)) return;
+        if (!CanVerifyAudio) return;
         AudioIsVerified = true;
     }
 
@@ -661,7 +662,7 @@ public partial class RecallPromptViewModel : ObservableObject
     [RelayCommand]
     private void VerifyCamera()
     {
-        if (string.IsNullOrEmpty(CameraRecallText)) return;
+        if (!CanVerifyCamera) return;
         CameraIsVerified = true;
     }
 
@@ -726,7 +727,7 @@ public partial class RecallPromptViewModel : ObservableObject
     [RelayCommand]
     private void SubmitPlanGuess()
     {
-        if (string.IsNullOrWhiteSpace(PlanGuessText) || PlanGuessSubmitted) return;
+        if (!CanSubmitPlanGuess) return;
         PlanGuessSubmitted = true;
         PlanRevealCountdown = PathHelper.PlanRevealDelaySeconds;
 
@@ -758,7 +759,7 @@ public partial class RecallPromptViewModel : ObservableObject
     [RelayCommand]
     private async Task SubmitNextPlanAsync()
     {
-        if (string.IsNullOrWhiteSpace(NextPlanText) || PlanCompleted) return;
+        if (!CanSubmitNextPlan) return;
 
         var planRecord = new PlanRecord
         {

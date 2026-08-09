@@ -177,24 +177,47 @@ public class SessionEngine
         SessionStateChanged?.Invoke();
     }
 
-    public void EnqueuePrompt(CycleRecord record)
+    public async Task EnqueuePrompt(CycleRecord record)
     {
-        var list = new List<CycleRecord>(_promptQueue) { record };
-        list.Sort((a, b) => b.ActualDurationTicks.CompareTo(a.ActualDurationTicks));
+        // Only the most recent unanswered prompt per duration cycle is kept — older ones
+        // for the same config are superseded rather than stacking up for the user to work through.
+        List<CycleRecord> stale;
+        lock (_promptLock)
+        {
+            var kept = new List<CycleRecord>();
+            stale = new List<CycleRecord>();
+            foreach (var r in _promptQueue)
+            {
+                if (r.SessionCycleConfigId == record.SessionCycleConfigId) stale.Add(r);
+                else kept.Add(r);
+            }
+            kept.Add(record);
+            kept.Sort((a, b) => b.ActualDurationTicks.CompareTo(a.ActualDurationTicks));
 
-        while (_promptQueue.TryDequeue(out _)) { }
-        foreach (var r in list) _promptQueue.Enqueue(r);
+            while (_promptQueue.TryDequeue(out _)) { }
+            foreach (var r in kept) _promptQueue.Enqueue(r);
+        }
+
+        foreach (var s in stale)
+        {
+            s.Status = CycleStatus.Missed;
+            s.MissedReason = "Superseded by a newer cycle before you responded";
+            await _db.UpdateCycleRecordAsync(s);
+            AppLogger.Log("SessionEngine", $"Cycle {s.Id} marked Missed — superseded by cycle {record.Id}");
+        }
 
         AppLogger.Log("SessionEngine", $"Prompt enqueued for cycle {record.Id} (queue size={_promptQueue.Count})");
 
+        bool shouldDequeue = false;
         lock (_promptLock)
         {
             if (!_promptWindowOpen)
             {
                 _promptWindowOpen = true;
-                DequeueNextPrompt();
+                shouldDequeue = true;
             }
         }
+        if (shouldDequeue) DequeueNextPrompt();
 
         SessionStateChanged?.Invoke();
     }
@@ -217,7 +240,7 @@ public class SessionEngine
             _audioCaptureService, _cameraCaptureService, sessionId);
         runner.PromptReady += async (record) =>
         {
-            await Task.Run(() => EnqueuePrompt(record));
+            await EnqueuePrompt(record);
         };
         runner.StatusChanged += (r, status) =>
         {

@@ -14,6 +14,7 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _defaultSessionNameTemplate = PathHelper.DefaultSessionNameTemplate;
     [ObservableProperty] private string _statusMessage = string.Empty;
     [ObservableProperty] private string _screenshotsFolder = PathHelper.ScreenshotsPath;
+    [ObservableProperty] private int _planRevealDelaySeconds = PathHelper.PlanRevealDelaySeconds;
 
     public SettingsViewModel(CleanupService cleanupService, Action onBack)
     {
@@ -21,6 +22,7 @@ public partial class SettingsViewModel : ObservableObject
         _onBack = onBack;
         _screenshotsFolder = PathHelper.ScreenshotsPath;
         _defaultSessionNameTemplate = PathHelper.DefaultSessionNameTemplate;
+        _planRevealDelaySeconds = PathHelper.PlanRevealDelaySeconds;
     }
 
     [RelayCommand]
@@ -50,6 +52,14 @@ public partial class SettingsViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(DefaultSessionNameTemplate)) return;
         PathHelper.DefaultSessionNameTemplate = DefaultSessionNameTemplate;
         StatusMessage = "Session name template saved.";
+    }
+
+    [RelayCommand]
+    private void SavePlanRevealDelay()
+    {
+        if (PlanRevealDelaySeconds < 1) return;
+        PathHelper.PlanRevealDelaySeconds = PlanRevealDelaySeconds;
+        StatusMessage = "Plan reveal delay saved.";
     }
 
     [RelayCommand]

@@ -35,6 +35,7 @@ public partial class SessionCycleConfigViewModel : ObservableObject
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsValid))] private bool _recognitionEnabled = true;
     [ObservableProperty] private bool _audioEnabled;
     [ObservableProperty] private bool _cameraEnabled;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsValid))] private bool _planRecallEnabled;
     [ObservableProperty] private bool _decoyOffsetExpanded;
 
     public ObservableCollection<DecoyOffsetViewModel> DecoyOffsets { get; } = new();
@@ -43,7 +44,7 @@ public partial class SessionCycleConfigViewModel : ObservableObject
     {
         get
         {
-            if (!FreeRecallEnabled && !RecognitionEnabled && !AudioEnabled && !CameraEnabled) return false;
+            if (!FreeRecallEnabled && !RecognitionEnabled && !AudioEnabled && !CameraEnabled && !PlanRecallEnabled) return false;
             var duration = TotalDuration;
             if (duration <= TimeSpan.Zero) return false;
             var window = TimeSpan.FromMinutes(WaitingWindowMinutes);
@@ -57,7 +58,7 @@ public partial class SessionCycleConfigViewModel : ObservableObject
     {
         get
         {
-            if (!FreeRecallEnabled && !RecognitionEnabled && !AudioEnabled && !CameraEnabled)
+            if (!FreeRecallEnabled && !RecognitionEnabled && !AudioEnabled && !CameraEnabled && !PlanRecallEnabled)
                 return "At least one recall type must be enabled.";
             var duration = TotalDuration;
             if (duration <= TimeSpan.Zero)
@@ -118,6 +119,7 @@ public partial class SessionCycleConfigViewModel : ObservableObject
             RecognitionEnabled = RecognitionEnabled,
             AudioEnabled = AudioEnabled,
             CameraEnabled = CameraEnabled,
+            PlanRecallEnabled = PlanRecallEnabled,
         };
 
         var decoys = DecoyOffsets

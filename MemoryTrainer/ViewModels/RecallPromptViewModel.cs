@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using MemoryTrainer.Helpers;
 using MemoryTrainer.Models;
 using MemoryTrainer.Services;
+using System.Windows.Threading;
 using static MemoryTrainer.Helpers.AppLogger;
 
 namespace MemoryTrainer.ViewModels;
@@ -43,6 +44,7 @@ public partial class RecallPromptViewModel : ObservableObject
     public bool OnScreenshotTab => _tabs.Count > _stepIndex && _tabs[_stepIndex] == "Screenshot";
     public bool OnAudioTab => _tabs.Count > _stepIndex && _tabs[_stepIndex] == "Audio";
     public bool OnCameraTab => _tabs.Count > _stepIndex && _tabs[_stepIndex] == "Camera";
+    public bool OnPlanTab => _tabs.Count > _stepIndex && _tabs[_stepIndex] == "Plan";
     public bool IsLastTab => _stepIndex == _tabs.Count - 1;
     public string NextButtonText => IsLastTab ? "Done" : "Next →";
     public System.Collections.ObjectModel.ObservableCollection<StepIndicatorItem> StepIndicators { get; } = new();
@@ -100,6 +102,25 @@ public partial class RecallPromptViewModel : ObservableObject
     public bool ShowCameraRecognition => CameraRecallCompleted && CameraRecognitionAvailable;
     public System.Collections.ObjectModel.ObservableCollection<RecognitionOptionViewModel> CameraRecognitionOptions { get; } = new();
 
+    // ── Plan tab ──
+    [ObservableProperty] private string _planHeaderText = string.Empty;
+    [ObservableProperty] private bool _hasPriorPlan;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanSubmitPlanGuess))] private string _planGuessText = string.Empty;
+    [ObservableProperty] private bool _planGuessSubmitted;
+    [ObservableProperty] private int _planRevealCountdown;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowPlanRating))] private bool _planRevealed;
+    [ObservableProperty] private string _priorPlanText = string.Empty;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowNextPlanEntry))] private bool? _planSelfCorrect;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowNextPlanEntry))] private bool _planRatingCompleted;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanSubmitNextPlan))] private string _nextPlanText = string.Empty;
+    [ObservableProperty] private bool _planCompleted;
+    private DispatcherTimer? _planRevealTimer;
+
+    public bool CanSubmitPlanGuess => !string.IsNullOrWhiteSpace(PlanGuessText) && !PlanGuessSubmitted;
+    public bool ShowPlanRating => PlanRevealed && !PlanRatingCompleted;
+    public bool ShowNextPlanEntry => !HasPriorPlan || PlanRatingCompleted;
+    public bool CanSubmitNextPlan => !string.IsNullOrWhiteSpace(NextPlanText) && !PlanCompleted;
+
     // ── Navigation ──
     [ObservableProperty] private bool _canGoNext;
     [ObservableProperty] private bool _canDismiss;
@@ -156,6 +177,10 @@ public partial class RecallPromptViewModel : ObservableObject
         if (RecognitionEnabled && _cameraCapture != null)
             await BuildCameraRecognitionOptionsAsync(captures);
 
+        // Plan tab
+        if (_config.PlanRecallEnabled)
+            await LoadPriorPlanAsync();
+
         if (ct.IsCancellationRequested) return;
 
         _audioPlayer.PlaybackStopped += () =>
@@ -180,6 +205,7 @@ public partial class RecallPromptViewModel : ObservableObject
         _tabs.Add("Screenshot");
         if (_config.AudioEnabled && _audioCapture != null) _tabs.Add("Audio");
         if (_config.CameraEnabled && _cameraCapture != null) _tabs.Add("Camera");
+        if (_config.PlanRecallEnabled) _tabs.Add("Plan");
 
         StepIndicators.Clear();
         for (int i = 0; i < _tabs.Count; i++)
@@ -195,6 +221,7 @@ public partial class RecallPromptViewModel : ObservableObject
         OnPropertyChanged(nameof(OnScreenshotTab));
         OnPropertyChanged(nameof(OnAudioTab));
         OnPropertyChanged(nameof(OnCameraTab));
+        OnPropertyChanged(nameof(OnPlanTab));
         OnPropertyChanged(nameof(IsLastTab));
         OnPropertyChanged(nameof(NextButtonText));
     }
@@ -365,6 +392,16 @@ public partial class RecallPromptViewModel : ObservableObject
         CameraRecognitionAvailable = true;
     }
 
+    private async Task LoadPriorPlanAsync()
+    {
+        var prev = await _db.GetPreviousPlanRecordAsync(_config.Id, _record.CycleNumber);
+        HasPriorPlan = prev != null && !string.IsNullOrWhiteSpace(prev.NextPlanText);
+        PriorPlanText = HasPriorPlan ? prev!.NextPlanText : string.Empty;
+        PlanHeaderText = HasPriorPlan
+            ? $"What do you think you planned to do this past {_durationLabel}?"
+            : "What do you plan to do next?";
+    }
+
     // ── Navigation ──
 
     private void UpdateNavigation()
@@ -376,6 +413,7 @@ public partial class RecallPromptViewModel : ObservableObject
             "Screenshot" => IsScreenshotTabComplete,
             "Audio" => IsAudioTabComplete,
             "Camera" => IsCameraTabComplete,
+            "Plan" => PlanCompleted,
             _ => false
         };
         OnPropertyChanged(nameof(NextButtonText));
@@ -413,6 +451,7 @@ public partial class RecallPromptViewModel : ObservableObject
         OnPropertyChanged(nameof(OnScreenshotTab));
         OnPropertyChanged(nameof(OnAudioTab));
         OnPropertyChanged(nameof(OnCameraTab));
+        OnPropertyChanged(nameof(OnPlanTab));
         UpdateNavigation();
     }
 
@@ -422,6 +461,12 @@ public partial class RecallPromptViewModel : ObservableObject
         _initCts.Cancel();
         _audioPlayer.Dispose();
         _audioOptionPlayer.Dispose();
+        if (_planRevealTimer != null)
+        {
+            _planRevealTimer.Tick -= OnPlanRevealTick;
+            _planRevealTimer.Stop();
+            _planRevealTimer = null;
+        }
         await _engine.EvaluationCompleteAsync(_record);
         CanDismiss = true;
         DismissRequested?.Invoke();
@@ -673,6 +718,60 @@ public partial class RecallPromptViewModel : ObservableObject
         await _db.CreateCameraRecognitionResultAsync(result);
         CameraRecognitionCompleted = true;
         Log("RecallPromptViewModel", $"Camera recognition: selected {(option.IsCorrect ? "correct" : "wrong")} option for cycle {_record.Id}");
+        UpdateNavigation();
+    }
+
+    // ── Plan tab commands ──
+
+    [RelayCommand]
+    private void SubmitPlanGuess()
+    {
+        if (string.IsNullOrWhiteSpace(PlanGuessText) || PlanGuessSubmitted) return;
+        PlanGuessSubmitted = true;
+        PlanRevealCountdown = PathHelper.PlanRevealDelaySeconds;
+
+        _planRevealTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _planRevealTimer.Tick += OnPlanRevealTick;
+        _planRevealTimer.Start();
+    }
+
+    private void OnPlanRevealTick(object? sender, EventArgs e)
+    {
+        PlanRevealCountdown--;
+        if (PlanRevealCountdown > 0) return;
+
+        _planRevealTimer!.Tick -= OnPlanRevealTick;
+        _planRevealTimer.Stop();
+        _planRevealTimer = null;
+        PlanRevealed = true;
+    }
+
+    [RelayCommand]
+    private void RatePlan(string result)
+    {
+        if (PlanRatingCompleted) return;
+        PlanSelfCorrect = result == "Correct";
+        PlanRatingCompleted = true;
+        Log("RecallPromptViewModel", $"Plan recall self-rated '{result}' for cycle {_record.Id}");
+    }
+
+    [RelayCommand]
+    private async Task SubmitNextPlanAsync()
+    {
+        if (string.IsNullOrWhiteSpace(NextPlanText) || PlanCompleted) return;
+
+        var planRecord = new PlanRecord
+        {
+            CycleRecordId = _record.Id,
+            PriorPlanText = HasPriorPlan ? PriorPlanText : null,
+            RecalledText = HasPriorPlan ? PlanGuessText : null,
+            SelfRatedCorrect = HasPriorPlan ? PlanSelfCorrect : null,
+            NextPlanText = NextPlanText.Trim(),
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        await _db.CreatePlanRecordAsync(planRecord);
+        PlanCompleted = true;
+        Log("RecallPromptViewModel", $"Plan recorded for cycle {_record.Id}: hasPrior={HasPriorPlan}, selfCorrect={PlanSelfCorrect}");
         UpdateNavigation();
     }
 }

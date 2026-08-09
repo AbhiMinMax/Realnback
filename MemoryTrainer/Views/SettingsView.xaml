@@ -60,6 +60,24 @@
 
                 <Separator Background="{StaticResource BorderBrush}" Margin="0,16,0,16" MaxWidth="500" HorizontalAlignment="Left"/>
 
+                <!-- Plan reveal delay -->
+                <TextBlock Text="Plan Recall Reveal Delay" Style="{StaticResource SectionHeader}" Margin="0,0,0,4"/>
+                <TextBlock Style="{StaticResource Label}" TextWrapping="Wrap" Margin="0,0,0,8" MaxWidth="500" HorizontalAlignment="Left"
+                           Text="How long you must wait, in seconds, after entering your guess before the Plan Recall step reveals what you actually planned."/>
+                <Grid MaxWidth="500" HorizontalAlignment="Left" Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Width="60"
+                             Text="{Binding PlanRevealDelaySeconds, UpdateSourceTrigger=PropertyChanged}"
+                             VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Content="Save" Margin="6,0,0,0"
+                            Command="{Binding SavePlanRevealDelayCommand}"/>
+                </Grid>
+
+                <Separator Background="{StaticResource BorderBrush}" Margin="0,16,0,16" MaxWidth="500" HorizontalAlignment="Left"/>
+
                 <!-- Danger zone -->
                 <TextBlock Text="Danger Zone" Style="{StaticResource SectionHeader}" Margin="0,0,0,8"/>
                 <Button Content="Delete All Captured Media" Style="{StaticResource DangerButton}"

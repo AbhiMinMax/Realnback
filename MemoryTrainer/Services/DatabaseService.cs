@@ -147,6 +147,17 @@ public class DatabaseService
                 FOREIGN KEY (CycleRecordId) REFERENCES CycleRecords(Id)
             );
 
+            CREATE TABLE IF NOT EXISTS PlanRecords (
+                Id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                CycleRecordId   INTEGER NOT NULL UNIQUE,
+                PriorPlanText   TEXT,
+                RecalledText    TEXT,
+                SelfRatedCorrect INTEGER,
+                NextPlanText    TEXT NOT NULL,
+                CreatedAtUtc    TEXT NOT NULL,
+                FOREIGN KEY (CycleRecordId) REFERENCES CycleRecords(Id)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_cyclerecords_configid ON CycleRecords(SessionCycleConfigId);
             CREATE INDEX IF NOT EXISTS idx_cyclerecords_status ON CycleRecords(Status);
             CREATE INDEX IF NOT EXISTS idx_screenshots_cyclerecordid ON ScreenshotRecords(CycleRecordId);
@@ -157,11 +168,13 @@ public class DatabaseService
             CREATE INDEX IF NOT EXISTS idx_camerarecall_cyclerecordid ON CameraRecallResults(CycleRecordId);
             CREATE INDEX IF NOT EXISTS idx_audiorecognition_cyclerecordid ON AudioRecognitionResults(CycleRecordId);
             CREATE INDEX IF NOT EXISTS idx_camerarecognition_cyclerecordid ON CameraRecognitionResults(CycleRecordId);
+            CREATE INDEX IF NOT EXISTS idx_planrecords_cyclerecordid ON PlanRecords(CycleRecordId);
         ");
 
         // Migrations for existing DBs — ignore if column already exists
         TryMigrate(conn, "ALTER TABLE SessionCycleConfigs ADD COLUMN AudioEnabled INTEGER NOT NULL DEFAULT 0");
         TryMigrate(conn, "ALTER TABLE SessionCycleConfigs ADD COLUMN CameraEnabled INTEGER NOT NULL DEFAULT 0");
+        TryMigrate(conn, "ALTER TABLE SessionCycleConfigs ADD COLUMN PlanRecallEnabled INTEGER NOT NULL DEFAULT 0");
     }
 
     private static void TryMigrate(SqliteConnection conn, string sql)
@@ -264,6 +277,7 @@ public class DatabaseService
                              (SELECT Id FROM SessionCycleConfigs WHERE SessionId = @Id)";
             await conn.ExecuteAsync($"DELETE FROM AudioRecallResults WHERE CycleRecordId IN ({cycleIds})", new { Id = sessionId });
             await conn.ExecuteAsync($"DELETE FROM CameraRecallResults WHERE CycleRecordId IN ({cycleIds})", new { Id = sessionId });
+            await conn.ExecuteAsync($"DELETE FROM PlanRecords WHERE CycleRecordId IN ({cycleIds})", new { Id = sessionId });
             await conn.ExecuteAsync($"DELETE FROM RecognitionResults WHERE CycleRecordId IN ({cycleIds})", new { Id = sessionId });
             await conn.ExecuteAsync($"DELETE FROM FreeRecallResults WHERE CycleRecordId IN ({cycleIds})", new { Id = sessionId });
             await conn.ExecuteAsync($"DELETE FROM CaptureRecords WHERE CycleRecordId IN ({cycleIds})", new { Id = sessionId });
@@ -299,10 +313,10 @@ public class DatabaseService
             return await conn.ExecuteScalarAsync<int>(@"
                 INSERT INTO SessionCycleConfigs
                     (SessionId, BaseDurationTicks, WaitingWindowTicks, DriftMinutes,
-                     FreeRecallEnabled, RecognitionEnabled, AudioEnabled, CameraEnabled)
+                     FreeRecallEnabled, RecognitionEnabled, AudioEnabled, CameraEnabled, PlanRecallEnabled)
                 VALUES
                     (@SessionId, @BaseDurationTicks, @WaitingWindowTicks, @DriftMinutes,
-                     @FreeRecallEnabled, @RecognitionEnabled, @AudioEnabled, @CameraEnabled);
+                     @FreeRecallEnabled, @RecognitionEnabled, @AudioEnabled, @CameraEnabled, @PlanRecallEnabled);
                 SELECT last_insert_rowid();",
                 new
                 {
@@ -314,6 +328,7 @@ public class DatabaseService
                     RecognitionEnabled = config.RecognitionEnabled ? 1 : 0,
                     AudioEnabled = config.AudioEnabled ? 1 : 0,
                     CameraEnabled = config.CameraEnabled ? 1 : 0,
+                    PlanRecallEnabled = config.PlanRecallEnabled ? 1 : 0,
                 });
         });
     }
@@ -333,6 +348,7 @@ public class DatabaseService
             RecognitionEnabled = (long)r.RecognitionEnabled == 1,
             AudioEnabled = (long)r.AudioEnabled == 1,
             CameraEnabled = (long)r.CameraEnabled == 1,
+            PlanRecallEnabled = (long)r.PlanRecallEnabled == 1,
         }).ToList();
     }
 
@@ -736,6 +752,62 @@ public class DatabaseService
                     EvaluatedAtUtc = result.EvaluatedAtUtc.ToString("O")
                 });
         });
+    }
+
+    // ── PlanRecords ──
+
+    public async Task CreatePlanRecordAsync(PlanRecord record)
+    {
+        await RetryAsync(async () =>
+        {
+            using var conn = OpenConnection();
+            await conn.ExecuteAsync(@"
+                INSERT INTO PlanRecords (CycleRecordId, PriorPlanText, RecalledText, SelfRatedCorrect, NextPlanText, CreatedAtUtc)
+                VALUES (@CycleRecordId, @PriorPlanText, @RecalledText, @SelfRatedCorrect, @NextPlanText, @CreatedAtUtc)",
+                new
+                {
+                    record.CycleRecordId,
+                    record.PriorPlanText,
+                    record.RecalledText,
+                    SelfRatedCorrect = record.SelfRatedCorrect.HasValue ? (record.SelfRatedCorrect.Value ? 1 : 0) : (int?)null,
+                    record.NextPlanText,
+                    CreatedAtUtc = record.CreatedAtUtc.ToString("O")
+                });
+        });
+    }
+
+    public async Task<PlanRecord?> GetPlanRecordByCycleAsync(int cycleRecordId)
+    {
+        using var conn = OpenConnection();
+        var row = await conn.QueryFirstOrDefaultAsync("SELECT * FROM PlanRecords WHERE CycleRecordId = @CycleRecordId", new { CycleRecordId = cycleRecordId });
+        if (row == null) return null;
+        return MapPlanRecord(row);
+    }
+
+    public async Task<PlanRecord?> GetPreviousPlanRecordAsync(int configId, int cycleNumber)
+    {
+        using var conn = OpenConnection();
+        var row = await conn.QueryFirstOrDefaultAsync(@"
+            SELECT pr.* FROM PlanRecords pr
+            INNER JOIN CycleRecords cr ON cr.Id = pr.CycleRecordId
+            WHERE cr.SessionCycleConfigId = @ConfigId AND cr.CycleNumber = @CycleNumber",
+            new { ConfigId = configId, CycleNumber = cycleNumber - 1 });
+        if (row == null) return null;
+        return MapPlanRecord(row);
+    }
+
+    private static PlanRecord MapPlanRecord(dynamic r)
+    {
+        return new PlanRecord
+        {
+            Id = (int)r.Id,
+            CycleRecordId = (int)r.CycleRecordId,
+            PriorPlanText = (string?)r.PriorPlanText,
+            RecalledText = (string?)r.RecalledText,
+            SelfRatedCorrect = r.SelfRatedCorrect != null ? (long)r.SelfRatedCorrect == 1 : null,
+            NextPlanText = (string)r.NextPlanText,
+            CreatedAtUtc = DateTime.Parse((string)r.CreatedAtUtc, null, System.Globalization.DateTimeStyles.RoundtripKind),
+        };
     }
 
     // ── History Queries ──

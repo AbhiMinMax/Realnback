@@ -11,5 +11,6 @@ public class SessionCycleConfig
     public bool RecognitionEnabled { get; set; }
     public bool AudioEnabled { get; set; }
     public bool CameraEnabled { get; set; }
+    public bool PlanRecallEnabled { get; set; }
     // Decoy offsets stored in separate table, linked by SessionCycleConfigId
 }

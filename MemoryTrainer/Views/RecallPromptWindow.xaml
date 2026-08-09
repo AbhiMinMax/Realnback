@@ -273,6 +273,83 @@
                 </StackPanel>
             </StackPanel>
 
+            <!-- ── PLAN TAB ── -->
+            <StackPanel Visibility="{Binding OnPlanTab, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="{Binding PlanHeaderText}" FontSize="16" FontWeight="Bold"
+                           Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,16" TextWrapping="Wrap"/>
+
+                <!-- Recall the prior plan (only if one exists) -->
+                <StackPanel Visibility="{Binding HasPriorPlan, Converter={StaticResource BoolToVisibility}}">
+                    <TextBox Text="{Binding PlanGuessText, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True" TextWrapping="Wrap"
+                             MinHeight="80" MaxHeight="160" VerticalScrollBarVisibility="Auto"
+                             IsReadOnly="{Binding PlanGuessSubmitted}" Margin="0,0,0,8"/>
+                    <Button Content="Submit" Command="{Binding SubmitPlanGuessCommand}"
+                            IsEnabled="{Binding CanSubmitPlanGuess}" HorizontalAlignment="Left"
+                            Visibility="{Binding PlanGuessSubmitted, Converter={StaticResource InverseBoolToVisibility}}"
+                            Margin="0,0,0,12"/>
+
+                    <!-- Countdown before reveal -->
+                    <TextBlock Margin="0,0,0,12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource Label}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding PlanGuessSubmitted}" Value="True"/>
+                                            <Condition Binding="{Binding PlanRevealed}" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                        <Run Text="Revealing what you actually planned in "/>
+                        <Run Text="{Binding PlanRevealCountdown}"/>
+                        <Run Text="s…"/>
+                    </TextBlock>
+
+                    <!-- Reveal + self-rating -->
+                    <StackPanel Visibility="{Binding PlanRevealed, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Style="{StaticResource Label}" Margin="0,0,0,6" TextWrapping="Wrap">
+                            <Run Text="You planned: "/>
+                            <Run Text="{Binding PriorPlanText}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </TextBlock>
+                        <StackPanel Visibility="{Binding ShowPlanRating, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Did you recall that correctly?" Style="{StaticResource Label}" Margin="0,0,0,6"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <Button Content="Correct" Margin="0,0,8,0"
+                                        Command="{Binding RatePlanCommand}" CommandParameter="Correct"/>
+                                <Button Content="Wrong" Style="{StaticResource DangerButton}"
+                                        Command="{Binding RatePlanCommand}" CommandParameter="Wrong"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <TextBlock Visibility="{Binding PlanRatingCompleted, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8">
+                            <Run Text="Self-rated: "/>
+                            <Run Text="{Binding PlanSelfCorrect, Converter={StaticResource BoolToCorrectWrong}}"
+                                 Foreground="{Binding PlanSelfCorrect, Converter={StaticResource BoolToCorrectColor}}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </StackPanel>
+
+                <Separator Margin="0,4,0,12" Visibility="{Binding ShowNextPlanEntry, Converter={StaticResource BoolToVisibility}}"/>
+
+                <!-- Next plan -->
+                <StackPanel Visibility="{Binding ShowNextPlanEntry, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="What do you plan to do for the next stretch?" Style="{StaticResource Label}" Margin="0,0,0,6" TextWrapping="Wrap"/>
+                    <TextBox Text="{Binding NextPlanText, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True" TextWrapping="Wrap"
+                             MinHeight="80" MaxHeight="160" VerticalScrollBarVisibility="Auto"
+                             IsReadOnly="{Binding PlanCompleted}" Margin="0,0,0,8"/>
+                    <Button Content="Submit" Command="{Binding SubmitNextPlanCommand}"
+                            IsEnabled="{Binding CanSubmitNextPlan}" HorizontalAlignment="Left"
+                            Visibility="{Binding PlanCompleted, Converter={StaticResource InverseBoolToVisibility}}"/>
+                    <TextBlock Text="Plan saved." Foreground="{StaticResource SuccessBrush}"
+                               Visibility="{Binding PlanCompleted, Converter={StaticResource BoolToVisibility}}" Margin="0,4,0,0"/>
+                </StackPanel>
+            </StackPanel>
+
             <!-- Next / Done -->
             <Button Content="{Binding NextButtonText}"
                     Command="{Binding NextCommand}"

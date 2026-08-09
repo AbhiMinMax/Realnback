@@ -13,6 +13,7 @@ public static class PathHelper
 
     private static string? _screenshotsPathOverride;
     private static string? _defaultSessionNameTemplate;
+    private static int _planRevealDelaySeconds = 5;
 
     public static string ScreenshotsPath
     {
@@ -31,6 +32,16 @@ public static class PathHelper
         set
         {
             _defaultSessionNameTemplate = string.IsNullOrWhiteSpace(value) ? null : value;
+            SaveSettings();
+        }
+    }
+
+    public static int PlanRevealDelaySeconds
+    {
+        get => _planRevealDelaySeconds;
+        set
+        {
+            _planRevealDelaySeconds = value < 1 ? 1 : value;
             SaveSettings();
         }
     }
@@ -66,6 +77,10 @@ public static class PathHelper
                 if (!string.IsNullOrWhiteSpace(val))
                     _defaultSessionNameTemplate = val;
             }
+            if (doc.RootElement.TryGetProperty("PlanRevealDelaySeconds", out var el3) && el3.TryGetInt32(out var delay) && delay >= 1)
+            {
+                _planRevealDelaySeconds = delay;
+            }
         }
         catch (Exception ex)
         {
@@ -77,7 +92,7 @@ public static class PathHelper
     {
         try
         {
-            var settings = new { ScreenshotsPath = _screenshotsPathOverride, DefaultSessionNameTemplate = _defaultSessionNameTemplate };
+            var settings = new { ScreenshotsPath = _screenshotsPathOverride, DefaultSessionNameTemplate = _defaultSessionNameTemplate, PlanRevealDelaySeconds = _planRevealDelaySeconds };
             var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(SettingsFilePath, json);
         }

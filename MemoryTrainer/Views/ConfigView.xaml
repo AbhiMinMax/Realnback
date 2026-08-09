@@ -140,12 +140,22 @@
                                                     </ToolTip>
                                                 </CheckBox.ToolTip>
                                             </CheckBox>
-                                            <CheckBox Content="Camera" IsChecked="{Binding CameraEnabled}" VerticalAlignment="Center">
+                                            <CheckBox Content="Camera" IsChecked="{Binding CameraEnabled}" Margin="0,0,10,0" VerticalAlignment="Center">
                                                 <CheckBox.ToolTip>
                                                     <ToolTip>
                                                         <StackPanel MaxWidth="260">
                                                             <TextBlock Text="Camera Capture" FontWeight="Bold" Margin="0,0,0,4"/>
                                                             <TextBlock TextWrapping="Wrap" Text="Takes a single webcam snapshot at the capture time. Requires a connected camera. Skipped silently if no device is found."/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </CheckBox.ToolTip>
+                                            </CheckBox>
+                                            <CheckBox Content="Plan Recall" IsChecked="{Binding PlanRecallEnabled}" VerticalAlignment="Center">
+                                                <CheckBox.ToolTip>
+                                                    <ToolTip>
+                                                        <StackPanel MaxWidth="260">
+                                                            <TextBlock Text="Plan Recall" FontWeight="Bold" Margin="0,0,0,4"/>
+                                                            <TextBlock TextWrapping="Wrap" Text="Last step of the prompt. Recall what you think you planned to do this cycle, reveal the actual plan after a short delay, self-rate as Correct or Wrong, then write what you plan to do next cycle."/>
                                                         </StackPanel>
                                                     </ToolTip>
                                                 </CheckBox.ToolTip>

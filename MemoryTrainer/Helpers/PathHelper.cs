@@ -5,7 +5,23 @@ namespace MemoryTrainer.Helpers;
 public static class PathHelper
 {
     public static string AppFolder => AppContext.BaseDirectory;
-    public static string DataFolder => Path.Combine(AppFolder, "data");
+
+    /// <summary>
+    /// Shared data folder used by every build (debug, release and published), so the
+    /// database and captured media live in one place instead of beside each exe.
+    /// Override with the MEMORYTRAINER_DATA environment variable to point a build at
+    /// a throwaway folder.
+    /// </summary>
+    public const string DefaultDataFolder = @"C:\common\Projects\claude\memory apps\realnback\working\data";
+
+    public static string DataFolder
+    {
+        get
+        {
+            var overridePath = Environment.GetEnvironmentVariable("MEMORYTRAINER_DATA");
+            return string.IsNullOrWhiteSpace(overridePath) ? DefaultDataFolder : overridePath;
+        }
+    }
     public static string DatabasePath => Path.Combine(DataFolder, "memorytrainer.db");
     public static string ErrorLogPath => Path.Combine(DataFolder, "error.log");
     public static string AppLogPath => Path.Combine(DataFolder, "app.log");
